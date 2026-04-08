@@ -40,6 +40,29 @@ This file was rewritten after a full /plan-eng-review pass + outside voice revie
 
 ---
 
+## CEO Review Decision Log (2026-04-08)
+
+This file was further revised after a `/plan-ceo-review` pass + outside voice review on 2026-04-08 evening. The eng review decisions above (1-21) all stand. The CEO review added the following decisions on top:
+
+| # | Decision | Rationale |
+|---|---|---|
+| 22 | **Reframed killer-feature thesis: "operations layer for amateur club captains," NOT "shared source of truth between two equal managers"** | Multi-manager scaffolding is only load-bearing for Module 2. Module 1 and Module 3 work fine single-user. The reframe narrows the headline; multi-manager is now a *capability*, not the *thesis*. CV story: M1 leads on demo, M2 is the depth play (Excel-over-OCR product judgment), M3 is the breadth play. |
+| 23 | **Module 3 (Band auto-post) is PROTECTED in MVP — no longer the cut valve** | Outside voice surfaced that the reframed thesis is hollow at MVP if M3 cuts. New cut valve = polish + Maestro coverage. If you run late, you ship with thinner test coverage and rougher polish, NOT a missing module. |
+| 24 | **Naver Band write-scope verification moved from W9 to W1 P0** (was Decision 17) | If approval-gated, USER must start the application same-day as the W1 research. With M3 protected (Decision 23), there's no fallback if approval doesn't clear by W10. 30-90 min research at developers.naver.com. |
+| 25 | **PIPA captain-attestation pattern for member PII** | Outside voice flagged that the captain's consent flow doesn't address members' PII. New W2 schema column `members.notice_acknowledged_at`, W4 UI checkbox, privacy policy section. Implements PIPA legitimate-interest basis with notice. Real legal de-risking. |
+| 26 | **DESIGN.md updated to v3 to mirror BUILD.md** | DESIGN.md was stale relative to BUILD.md in 8 places (Hilt, Room, Cloudflare, App Links, domain, multi-manager thesis, reviewer concerns, cost table). User chose: BUILD.md is the source of truth on tech, DESIGN.md gets aligned. Done in CEO review outputs. |
+| 27 | **Sentry moved from W11 polish to W3 alongside Android scaffold** | W11 polish is the busiest week and Sentry frequently gets skipped under pressure. ~30 min to add SDK + 1-line init in W3 instead. Free tier covers MVP. |
+| 28 | **Minimal GitHub Actions CI added in W3** (was deferred in BUILD.md Part 5) | For a CV piece, an empty `.github/workflows/` at submission is a negative signal. ~1 hr to add Android build + lint + Maestro on every PR. Catches solo-dev test regressions. |
+| 29 | **Haiku schema decision register baked in BEFORE W6 implementation** | 4 ambiguities resolved: multi-date posts → store earliest as `date`, both in `raw_post_text`; "수도권 전체" → expand to [서울, 경기, 인천]; "오픈"/"친선" → map to "무관"; `parser_confidence` asked explicitly in the prompt with rubric. Locks W6 implementation. |
+| 30 | **Member deletion = anonymize, not hard delete or soft delete** | PIPA-compliant (PII gone) AND audit-trail intact (member_id and historical member_payments preserved). Implementation: `display_name` becomes "삭제된 회원", `kakao_handle = NULL`, but row stays. Affects W2 init migration. |
+| 31 | **Cafe post URL TextButton on tournament detail (W6)** | Trust escape hatch when LLM parser misses fields. ~30-60 min in W6. Requires `tournaments` table to also store `cafe_id`/`board_id` (or full URL) — verify in W2 schema. |
+| 32 | **Acquisition prep block in W12-13** (2-3 days during closed-test calendar window) | Acquisition was 4 bullets in DESIGN.md with no scoped work. Without it, the 13-week build's usage data at month 3 (the strategic CV-vs-SaaS decision point) could be 5 captains. Deliverables: cafe post wording, 홍보 rules verification, in-app KakaoTalk Sharesheet referral, in-person 60-sec demo script. |
+| 33 | **Captain interview script gets 2 new questions** (added pre-W1) | Outside voice tensions B+C: test whether Libero is the second-fastest source not the first (Daum cafe app push), and test whether the secretary will actually switch from her current Excel reconciliation. See `notes/captain-interview-script.md`. |
+
+These decisions ALL stand alongside the original 21 eng-review decisions. None overrides any prior decision; they extend the plan.
+
+---
+
 ## Part 0: The Day-1 Setup (~3-4 hours, do this BEFORE you open Android Studio)
 
 Order matters. Some of these unlock others. Some have clocks that start ticking the moment you click the button. **The first three items are PRIORITY 0 — do them tonight before anything else.**
@@ -126,6 +149,21 @@ You need this for FCM and Sign in with Google. Same Google account as Play Conso
 1. https://console.anthropic.com → API keys → Create
 2. Save the key (starts with `sk-ant-`)
 3. Add $5 of prepaid credit. At ~$0.001 per tournament parse and ~50-200 posts/day, $5 covers many months.
+
+### 0.7 Naver Band write-scope verification (PRIORITY 0, 30-90 min, $0) — NEW (CEO Decision 24)
+
+**Do this in W1 alongside KIPRIS + captain interviews. With Module 3 protected (Decision 23), there is no fallback if Naver Band's write scope is approval-gated and approval doesn't clear by W10.**
+
+1. Go to https://developers.naver.com/apps/#/list — register a new app called "리베로" (or 리베로 캡틴 if KIPRIS forced a fallback)
+2. Add the **Band Open API** product to the app
+3. Look for the available scopes — specifically the **write** / **post** scope (the one that lets you create new Band posts on behalf of the user)
+4. Try to enable it. The flow tells you one of three things:
+   - **Self-serve:** scope toggles on immediately, you have it. Document this in `notes/homework-results.md`. Module 3 is unblocked.
+   - **Approval-gated with form:** Naver shows you a Korean approval form. **Fill it out same-day.** The form typically asks for the use case, expected daily volume, and screenshots/mockups. Use the BUILD.md Module 3 description as the use case. Document the submission in `notes/homework-results.md` and check back daily. Approval typically takes 1-4 weeks.
+   - **Business-entity required:** Naver requires a 사업자등록번호 to grant the scope. **This is a strategic problem.** Options: (a) accept Module 3 ships with manual clipboard-paste fallback only (no auto-post), and re-add the API integration in v1.1 once you start 사업자등록 in month 3 if usage justifies the freemium pivot; (b) ship with a different mechanism (e.g., Naver Band Open API has historically also supported posting via the user's own Band Personal API token — investigate); (c) skip Module 3 entirely. Document the choice in `notes/homework-results.md`.
+5. **Failure mode:** if Naver Developers portal is down or you can't find the Band product anywhere, write that in `notes/homework-results.md` and escalate via developers.naver.com support email.
+
+**Pass criteria:** you have a definitive answer on whether Module 3's auto-post is achievable in MVP. The answer is recorded in `notes/homework-results.md`. If approval-gated, the application is submitted same-day.
 
 ### 0.6 Local tooling (30-60 min, $0)
 
@@ -506,6 +544,29 @@ All 5 gates pass (or fallbacks work and are documented). 20 real Daum posts capt
 - `supabase/migrations/20260408000001_rls_policies.sql` — RLS on every table; `tournaments` is global read-only; cascade deletes when a club is deleted
 - `supabase/migrations/20260408000002_subscription_scaffold.sql` — `subscription_tiers` + `club_subscriptions` (per Decision 14, kept as optionality)
 - `supabase/migrations/20260408000003_invite_code_function.sql` — `invite_code` column on `clubs` (6-char alphanumeric, excluding 0/O/1/I), `invite_code_expires_at` (7-day TTL), Postgres function `redeem_invite_code(p_code text)` that validates code + rate-limits + inserts into `club_managers` + raises Korean exceptions on failure
+- **CEO Decision 25 + 30 — PIPA captain attestation + member anonymization:** in `20260408000000_init_schema.sql`, the `members` table gets a new column:
+  ```sql
+  ALTER TABLE members ADD COLUMN notice_acknowledged_at timestamptz NULL;
+  -- Captain attests in W4 UI that she has informed this member that their info
+  -- is stored for dues management. Required by PIPA legitimate-interest basis.
+  ```
+  Plus a member-anonymization function (NOT cascade delete, NOT soft delete):
+  ```sql
+  CREATE OR REPLACE FUNCTION anonymize_member(p_member_id uuid)
+  RETURNS void LANGUAGE plpgsql AS $$
+  BEGIN
+    UPDATE members
+       SET display_name = '삭제된 회원',
+           kakao_handle = NULL
+     WHERE id = p_member_id;
+    -- Aliases stripped to prevent re-identification via member_aliases
+    DELETE FROM member_aliases WHERE member_id = p_member_id;
+    -- member_payments rows preserved for audit trail (no PII left after this)
+  END;
+  $$;
+  ```
+  The privacy policy (W2 draft, hosted W11) gets a new section "회원 정보 처리 (회비 관리 목적)" that names the captain as the PIPA data controller and the legitimate-interest basis.
+- **CEO Decision 31 — cafe URL columns on tournaments:** confirm the `tournaments` table includes `cafe_id text` and `board_id text` (or stores the constructed URL directly). The W6 expansion (cafe post link button) needs all three of `cafe_id` + `board_id` + `cafe_post_id` to construct `https://cafe.daum.net/<cafe_id>/<board_id>/<cafe_post_id>`. If only `cafe_post_id` exists currently, add the other two columns to the init migration.
 - `supabase/migrations/20260408000004_consents_table.sql` — **PIPA addition.** `consents` table tracking per-user, per-purpose consent timestamps:
   ```sql
   create table consents (
@@ -552,6 +613,44 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
 **Goal:** install the app on a real Android phone, see a first-launch consent screen, sign in with Google, see a "Create club" or "Join club" branch screen, complete the flow, land on a placeholder home.
 
 **Files:**
+- **CEO Decision 27 — Sentry in W3 (was W11):** add Sentry SDK to `android/app/build.gradle.kts`:
+  ```kotlin
+  implementation("io.sentry:sentry-android:7.14.0")
+  ```
+  In `LiberoApplication.kt`, after `startKoin { ... }`:
+  ```kotlin
+  Sentry.init { options ->
+      options.dsn = BuildConfig.SENTRY_DSN
+      options.environment = BuildConfig.BUILD_TYPE
+      options.tracesSampleRate = 0.2
+  }
+  ```
+  Add `SENTRY_DSN` to `local.properties` (gitignored). Free tier covers 5k events/month — enough for closed test + first months of production. ~30 min CC time.
+- **CEO Decision 28 — GitHub Actions CI in W3:** create `.github/workflows/android.yml`:
+  ```yaml
+  name: Android CI
+  on:
+    pull_request:
+      branches: [main]
+    push:
+      branches: [main]
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-java@v4
+          with:
+            distribution: temurin
+            java-version: 17
+        - name: Build
+          working-directory: android
+          run: ./gradlew :app:assembleDebug :app:lintDebug
+        - name: Unit tests (FuzzyMatcher etc.)
+          working-directory: android
+          run: ./gradlew :app:testDebugUnitTest
+  ```
+  Add a separate `.github/workflows/maestro.yml` that runs Maestro flows on a hosted Android emulator (Maestro Cloud free tier OR self-hosted via reactivecircus/android-emulator-runner@v2). ~1 hour CC time. Catches solo-dev test regressions and adds CV signal.
 - `android/app/build.gradle.kts` — Compose, Koin, Supabase Kotlin SDK, Credential Manager (or legacy GoogleSignInClient if Gate 1D failed), Maestro test runner setup, kotlinx-serialization, kotlinx-coroutines:
   ```kotlin
   // Supabase Kotlin SDK
@@ -754,6 +853,28 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
       }
       .collect { ... }
   ```
+- **CEO Decision 29 — Haiku schema decision register (lock for W6):**
+  - **Multi-date posts** (e.g., "예선 4월 15일, 본선 4월 22일"): extract the EARLIEST date as `tournament.date`. Store the full text in `raw_post_text` for re-parsing if needed. Document in `notes/haiku-schema-decisions.md`.
+  - **Region "수도권 전체" / "전국":** expand to `[서울, 경기, 인천]` for 수도권, and to ALL 17 시/도 for 전국. The Haiku prompt is told to do this expansion, and the column stores an array via JSON when expansion occurs.
+  - **Division "오픈" / "친선" / "교류":** map to `무관` (unrestricted) — these mean "anyone can play."
+  - **`parser_confidence` rating mechanism:** asked EXPLICITLY in the Haiku prompt with a rubric: "Rate your confidence 0.0-1.0 based on how unambiguously the post stated each of (date, location, region, fee, division). 1.0 = all 5 stated unambiguously. 0.6 = 3 of 5. <0.6 = critical fields missing or ambiguous."
+- **CEO Decision 31 — cafe post link button:**
+  ```kotlin
+  // In TournamentDetailScreen.kt
+  if (tournament.cafeId != null && tournament.boardId != null) {
+      TextButton(onClick = {
+          val url = "https://cafe.daum.net/${tournament.cafeId}/${tournament.boardId}/${tournament.cafePostId}"
+          val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+          try { context.startActivity(intent) } catch (e: ActivityNotFoundException) {
+              Toast.makeText(context, R.string.error_no_browser, Toast.LENGTH_SHORT).show()
+          }
+      }) { Text(stringResource(R.string.tournament_view_original_cafe_post)) }
+  }
+  ```
+  String resources: `tournament_view_original_cafe_post = "원본 게시글 보기"`. ~30-60 min including the schema check from W2.
+- **Section 2 fix — Haiku JSON schema validation:** add a Zod schema (or hand-rolled validator) at the boundary in `extract_tournament_fields`. On parse failure: write the row with `parser_confidence = 0`, log to a new `extraction_failures` table, do NOT dispatch. ~10 lines in W6.
+- **Section 8 fix — dispatch_metrics table:** new table tracking `tournament_id`, `dispatched_at`, `time_from_post_to_dispatch_ms = (now() - tournament.parsed_at)`. The dispatch Edge Function writes one row per fan-out. A Supabase view aggregates p50/p99 by week. This is the metric you check in production to know whether the killer feature is actually delivering on its latency promise.
+- **Section 6 fix — Haiku eval meta-test:** in the W6 eval suite, add 2 sanity-check corpus posts: one with hand-perfect ground truth that the eval should grade 100% on, and one with deliberately wrong Haiku output that the eval should grade 0% on. Catches the "your eval grader is broken and you don't notice" failure mode. ~15 min.
 - `android/app/src/main/java/kr/libero/captain/tournaments/TournamentDetailScreen.kt`
 
 **Demo at end of W6:**
@@ -801,7 +922,7 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
 
 **Gate to W8:** end-to-end works on a real Galaxy device, cold start tap from notification renders detail screen instantly.
 
-**Cut valve check at end of W7:** if you're more than 1 week behind here, **Module 3 (Band auto-post) is dropped** to v1.1 per the schedule slack policy. Decide and document NOW, don't pretend you'll catch up.
+**Cut valve check at end of W7 (REVISED — CEO Decision 23):** if you're more than 1 week behind here, **Maestro test coverage is thinned and polish work is dropped first**, NOT Module 3. Module 3 is now PROTECTED in MVP. The reframed thesis ("operations layer for amateur club captains") needs all 3 modules at MVP. If you cut M3, the thesis is hollow at launch. Decide what specifically gets cut from polish/Maestro NOW, don't pretend you'll catch up.
 
 ---
 
@@ -814,6 +935,7 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
 - `android/app/src/main/java/kr/libero/captain/payments/CreatePaymentCycleScreen.kt`
 - `android/app/src/main/java/kr/libero/captain/payments/PaymentCycleDetailScreen.kt`
 - `android/app/src/main/java/kr/libero/captain/payments/PaymentRepository.kt` — Supabase reads/writes for `payment_cycles` and `member_payments`, with **filtered realtime subscription** keyed by club_id
+- **CEO Decision 25 — PIPA captain attestation in MembersScreen.kt:** the add-member form includes a required checkbox "회원에게 정보 저장 사실을 알렸습니다 (PIPA 고지 의무)". The Submit button is disabled until the checkbox is checked. On submit, persist `members.notice_acknowledged_at = now()`. The checkbox cannot be auto-checked or pre-checked — captain has to actively tap it each time. This is the user-facing PIPA legitimate-interest notice mechanism.
 - `android/app/src/main/java/kr/libero/captain/members/MembersScreen.kt` — CRUD for `members`
 - `android/app/src/main/java/kr/libero/captain/members/MemberRepository.kt`
 
@@ -876,7 +998,7 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
 
 ### Week 10 — Module 3 (was Module 4): Naver Band Auto-Post + W9 Cut Decision
 
-**Pre-W10 hard gate:** by end of W9, you MUST have verified Naver Band Open API write scope is self-serve (not approval-gated). **If approval is gated and you have not been approved by end of W9, MODULE 3 IS CUT to v1.1** — ship clipboard-only practice poll text and move to W11. **Do not burn a week building against an unapproved API.** This trigger is earlier than the original "if Modules 1+2 ran over" trigger because the bottleneck is the API approval, not the dev velocity.
+**Pre-W10 hard gate (REVISED — CEO Decision 23 + 24):** by end of W9, you MUST know whether Naver Band Open API write scope is approved. Per CEO Decision 24, the verification happened in **W1**, not W9 — so by W9 you've had 8+ weeks of lead time to clear approval if it was gated. **If approval STILL isn't clear by end of W9, do NOT cut Module 3.** Instead: (a) escalate via Naver Developer support and re-submit if needed; (b) ship Module 3 in MVP with the **manual clipboard fallback as the implementation** (the same fallback BUILD.md already specifies for failure-path notifications) and add the API integration in v1.1 once approval clears; (c) only as last resort, ship M3 as configuration-only ("set the schedule, get notified to copy-paste") instead of true auto-post. Module 3 is PROTECTED — it ships in some form, even if degraded.
 
 **Goal (assuming gate passed):** captain configures a recurring weekly poll, the poll gets posted to Band on schedule, failures notify the captain via FCM with "tap to copy" fallback.
 
@@ -897,6 +1019,14 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
 ### Week 11 — Polish, Privacy Policy Hosting, Play Store Submission (with +1-2 week buffer)
 
 **Goal:** Korean privacy policy hosted somewhere accessible, Play Store listing in Korean, screenshots, demo video, AAB built and submitted to Internal + Closed Testing track. **Budget +1-2 extra weeks for Play Store financial-app review back-and-forth.**
+
+**CEO Decision 32 — Acquisition prep block (parallel to closed-test calendar window):** during the 14 calendar days while closed test runs, allocate 2-3 days to acquisition prep. The closed-test clock runs whether you work on it or not, so this is overlap, not added timeline. Deliverables:
+1. **Cafe post wording draft** (`notes/cafe-post-draft.md`) — written as "how I built this for my own captain" angle, NOT a marketing pitch. Focus on the pain (4 disconnected systems) and the structured-data product judgment (KakaoBank Excel parsing). ~2 hrs.
+2. **Daum cafe 홍보 rules verification** for `Let's go 생활체육배구` cafe specifically — read cafe rules, DM 카페매니저 if needed, document result in `notes/homework-results.md`. ~1 hr.
+3. **In-app KakaoTalk Sharesheet referral** — add a "다른 캡틴에게 추천" button to ClubSettingsScreen. Tapping launches `Intent.ACTION_SEND` with `type = "text/plain"` and a pre-written Korean message including the 6-char invite code: "[리베로] 9인제 동호회 캡틴들을 위한 도구. 대회 알림 + 회비 정산 + Naver Band 자동 게시. 가입 코드: ABC123. 다운로드: <Play Store URL>". Depends on the W2 invite code function being live (it is by W12). ~2-3 hrs CC.
+4. **Tournament-day in-person demo script** (`notes/demo-script.md`) — 60-second walkthrough you can give to another captain at a tournament. The killer demo: open the app, show the most recent tournament push, tap to detail, show the cafe post link, swipe to payments, show the Excel reconciliation auto-match output. Practice it. ~1 hr writing + 30 min self-rehearsal.
+
+**Cross-system risk note (outside voice finding 11):** the personal Daum account whose cookies feed the scraper is the same identity that may post to the cafe to promote Libero. If the cafe manager bans the account for self-promo, the scraper dies. **Mitigation:** the cafe post (deliverable 1) goes up via DM to 카페매니저 first, asking for permission, NOT a direct cafe post. If permission granted, post via the captain's account or the secretary's account, NOT the personal scraping account.
 
 **Files:**
 - **Privacy policy hosting** — without a domain, options:
@@ -986,7 +1116,7 @@ Pin these to your wall.
 | W1 Gate 1C pass | end of W1 | FCM doesn't deliver on Samsung battery opt → mandatory in-app guide screen for 잠자지 않는 앱 |
 | W1 Gate 1D pass | end of W1 | Credential Manager doesn't work on Korean OEM → fall back to legacy GoogleSignInClient |
 | W1 Gate 1E pass | end of W1 | Supabase latency from Korea unacceptable → keep dispatch warm via heartbeat cron |
-| **Naver Band write scope verified** | **end of W9** | **Approval-gated and not approved → CUT Module 3 to v1.1, ship clipboard-only practice poll** |
+| **Naver Band write scope verified (Part 0.7 — verified W1)** | **end of W1, escalation if unclear by W9** | **Approval-gated and unclear by W9 → escalate via Naver Developer support; ship M3 with manual clipboard-paste implementation and add API in v1.1. M3 is PROTECTED, not cut (CEO Decision 23).** |
 | Captain interview surfaces something that breaks the design | before W2 starts | Re-run /office-hours with new info, update DESIGN.md before continuing |
 | `time_from_post_to_notification` metric in production | first month after launch | Routinely >3h → revisit polling cadence trade-off (and the personal Daum account risk) |
 | 3-hour polling vs 30-min reconsideration | after first month of usage | If captains report "I'm getting these too late" → bump cadence to 30min, accept slight Daum stealth risk |
@@ -1003,7 +1133,7 @@ This BUILD.md gives you the build sequence. It does NOT cover:
 
 2. **CI/CD.** GitHub Actions for building the AAB, deploying Edge Functions, running Maestro tests on PR. → Set up after W3 once the scaffold is real. Don't over-engineer for a solo project. Maestro Cloud has a free tier.
 
-3. **Observability beyond Supabase dashboards.** No Sentry, no Datadog. → Add Sentry to the Android app and the Edge Functions in W11 polish week. Free tier is fine.
+3. **Observability beyond Supabase dashboards.** No Datadog. → Sentry is now added in **W3** alongside the Android scaffold (CEO Decision 27, was W11). Free tier is fine. Edge Function Sentry integration can stay W11 polish.
 
 4. **Korean lawyer PIPA consultation.** User chose self-research path. Risk accepted but not eliminated.
 
@@ -1033,14 +1163,14 @@ You're not in office hours mode anymore, you're in build mode. The next time you
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | 6 expansions proposed (3 accepted, 2 deferred, 1 skipped), 4 cross-model tensions surfaced and resolved. 12 new BUILD.md decisions baked in (Decisions 22-33). Reframed thesis from "shared SoT" → "operations layer." M3 upgraded from cut-valve → protected. 0 unresolved decisions. |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 13 issues raised across Architecture/Code Quality/Tests/Performance + 6 outside voice findings, all resolved or accepted with mitigation. 0 unresolved decisions. 0 critical gaps after mitigation. |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
-| Outside Voice | `Claude subagent (codex unavailable)` | Independent plan challenge | 1 | issues_found | 13 findings, 2 cross-model tensions (Room cache, invite code security) resolved, 4 new substantive decisions (PIPA, W1 gates, CV/SaaS strategy, +mitigations) |
+| Outside Voice | `Claude subagent (codex unavailable)` | Independent plan challenge | 2 | issues_found | Eng review pass: 13 findings. CEO review pass: 11 findings, 4 substantive cross-model tensions (M3 cut-valve contradiction, killer-feature latency math, M2 status-quo switching cost, PIPA third-party data) all resolved with user decisions. |
 
-**CROSS-MODEL:** Eng review and outside voice agreed on all major architectural simplifications (scraper hosting, DI, package structure, error handling). Outside voice contributed PIPA awareness, additional W1 gates, invite code security hardening, and the strategic CV-vs-SaaS framing — all of which the eng review missed and all of which were accepted with explicit reasoning.
+**CROSS-MODEL:** Eng review and outside voice agreed on architectural simplifications. CEO review's outside voice contributed: M3 cut-valve contradiction (now M3 is protected), killer-feature latency reality check (now in interview script), M2 adoption-risk (now in interview script), PIPA third-party data exposure (now W2 schema + W4 UI + privacy policy section). User-resolved 4/4 substantive tensions, sovereignty preserved.
 
 **UNRESOLVED:** 0
 
-**VERDICT:** ENG CLEARED — ready to implement. Run `/ship` after first commit. Optionally run `/plan-design-review` once W3 scaffold exists for visual design system work.
+**VERDICT:** ENG + CEO CLEARED — ready to implement. Doc state coherent: BUILD.md is the source of truth on tech, DESIGN.md was updated to v3 to mirror, CLAUDE.md voice updated to retire the old thesis. Optionally run `/plan-design-review` once W3 scaffold exists for visual design system work.

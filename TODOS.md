@@ -4,6 +4,25 @@ Deferred work captured during eng review or build. Each item has context for fut
 
 ## v2 (post-MVP, after real users complain)
 
+### Role-based UI / permission differentiation (captain vs 총무)
+**What:** Add UI branching and permission checks based on whether a user is the "captain" or "secretary" of a club. Examples: only the captain can edit tournament preferences; only the secretary can upload KakaoBank Excel; the captain has a "Mark as Paid" override the secretary doesn't; secretary sees a "Finance" tab the captain doesn't, etc.
+
+**Why deferred to v2:** Confirmed as a v1 design conviction on 2026-04-08 — every user inside a club sees identical screens, has identical permissions, and can do every action. The captain/secretary label is just metadata on the user record, not a permission gate. Reasoning: simpler v1, no permission-check branches in code, the killer-feature thesis ("shared source of truth between two equal managers") is actually undermined by role differentiation, and role-based design is a classic premature-design trap.
+
+**Pros (when v2 ships this):** more aligned with traditional Korean club hierarchies (회장/주장/총무 separation), enables clubs that explicitly want 권한 분리, better audit story for clubs with money disputes.
+
+**Cons (which is why it's deferred):** ~5x the design surface (every screen needs role-aware variants), permission RLS becomes more complex, onboarding has to ask "are you the captain or 총무" upfront, "I can't do this" friction for the "wrong" user, splits the codebase's mental model.
+
+**Trigger to actually build this:** ≥10 active captains explicitly complain they want 권한 분리. Until then, equal UI is correct. NOT before.
+
+**Context:** Captured during captain-interview prep on 2026-04-08 when the user corrected Claude's assumption that Module 2 might need role-differentiated UI based on who actually does KakaoBank reconciliation. The user's framing: "All the UI should be equal among whatever user they are, regardless of if they're captain or secretary. Modifying the feature into separate UI and roles is a next step."
+
+**Cheap optionality kept in v1:** the schema's `paid_by_user_id` field (and similar "who did this" audit fields) CAN exist in v1 — they don't surface in UI but they record who did what. If v2 needs to add audit-trail visibility, the data is already there. ~0 cost in v1, big saving in v2.
+
+**Depends on:** v1 shipped + ≥10 active captains + explicit complaint about权한 분리 (NOT speculative — wait for the actual signal).
+
+---
+
 ### Persistent cache layer (DataStore + tiny Room)
 **What:** Add DataStore for key-value config (club_id, sync timestamps, user prefs) + a 2-table Room database (`tournaments_cache`, `payment_cycle_cache`) for surviving Android process death.
 
@@ -48,11 +67,67 @@ Deferred work captured during eng review or build. Each item has context for fut
 
 **Cons:** time-intensive (need to find willing strangers, build rapport, schedule). Owns no immediate code changes — pure research.
 
-**Context:** Decided in /plan-eng-review revision (2026-04-08 evening) to ship v1 with own-club-only validation as a deliberate scope cut. The risk: if your club's workflow is unusually well-organized (or unusually chaotic), you may build modules that don't generalize. Mitigation: closely track the v1 retention curve from non-own-club captains in W12-W13 closed testing — if they churn fast, do these interviews immediately.
+**Context:** Decided in /plan-eng-review revision (2026-04-08 evening) to ship v1 with own-club-only validation as a deliberate scope cut. CEO review (2026-04-08 evening) reaffirmed this decision but sharpened the trigger.
 
-**When to do this:** after v1 ships AND closed test reveals patterns from non-own-club testers (positive or negative). Specifically: target between W12 and month 3.
+**SHARPENED TRIGGER (CEO review 2026-04-08):** during W12-13 closed testing, monitor non-own-club testers for ANY of these signals: (a) tester opens the app < 2 times after install, (b) tester uninstalls within 7 days, (c) tester gives feedback "this doesn't match how my club works." If ANY of those signals fires from ≥1 non-own-club tester, **halt v1.1 feature work and do these interviews immediately.** Do not wait until "patterns emerge."
+
+**When to do this:** triggered by closed-test signal above, OR by month 3 unconditionally (whichever comes first).
 
 **Depends on:** v1 in closed testing.
+
+---
+
+### Portfolio polish budget (CEO review deferral, 2026-04-08)
+
+**What:** README case-study rewrite, demo video, polished screenshots, "what I learned" decision-reversal section. Total ~3-4 days CC time.
+
+**Why:** Outside voice flagged that the 13-week build investment is converted into a CV-piece outcome by the polish, NOT by the build itself. CEO review recommended adding this in W11-W13; user chose to defer to post-W13.
+
+**CEO recommendation (NOT a hard contract):** aim to land all 4 deliverables within 1 week post-W13. The recommendation exists so the polish doesn't slip indefinitely. If it slips into week 2, that's the user's call. Deliverables broken out:
+1. README rewrite as a case study (the killer-feature pivot, the Hilt→Koin reversal, the Cloudflare→Supabase reversal, the Vision-OCR→KakaoBank-Excel pivot, the multi-manager reframe). ~1 day.
+2. Polished screenshots (5+ in Korean, generated via Android Studio Device Frame Generator). ~half day.
+3. 60-second demo video (emulator screen record + Korean captions). ~1 day.
+4. Decision Reversals section in README + linked deeper writeups. ~half-day.
+
+**Trigger:** day after W13 production rollout, OR earlier if user starts interviewing.
+
+**Depends on:** v1 shipped to Production.
+
+---
+
+### Confidence badge on tournaments (CEO review deferral, 2026-04-08)
+
+**What:** Show the Haiku `parser_confidence` value as a small visual badge on each tournament in the list view (e.g., "AI 92%" or a colored dot). The data is already in the schema. ~30 min CC time.
+
+**Why:** Pairs with the W6 cafe-post-link trust escape hatch. Builds calibrated trust in the LLM extraction over time. CV story bullet: "designed the UX around LLM uncertainty."
+
+**Trigger:** after MVP launch, build in v1.1 if captains complain about parser misses OR if you have a free hour during W12-13.
+
+**Depends on:** v1 shipped.
+
+---
+
+### Realtime backfill on reconnect (Section 2 deferral, 2026-04-08)
+
+**What:** When the Supabase Realtime SDK reconnects after a WebSocket disconnect, refetch relevant `tournaments` and `member_payments` rows where `created_at > last_seen` to backfill missed events.
+
+**Why:** Section 2 error map flagged this as a gap. The Supabase SDK handles reconnect but doesn't backfill missed events by default. For two managers in one club, the practical impact is "if your phone loses signal for an hour, you may miss a tournament push or a payment update from your co-manager." Acceptable for v1 scale; bug-prone at scale.
+
+**Trigger:** v2 work, or earlier if real users report stale data after network drops.
+
+**Depends on:** v1 shipped + real user complaints.
+
+---
+
+### Edge Function Sentry integration (CEO review deferral, 2026-04-08)
+
+**What:** Add Sentry to the Supabase Edge Functions (`scrape_daum_cafe`, `dispatch_tournament_match`, `post_band_poll`) for backend error tracking.
+
+**Why:** CEO Decision 27 moved Sentry to W3 for the Android app. Edge Function Sentry was kept at W11 polish week because it's a separate integration (Sentry has a Deno SDK but it's less mature than the Android one). If you skip W11 polish under pressure, this is the lowest-priority of the polish items to lose.
+
+**Trigger:** W11 polish, or v1.1 if W11 was tight.
+
+**Depends on:** Edge Functions deployed in W5-W6.
 
 ---
 

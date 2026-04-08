@@ -4,23 +4,23 @@
 >
 > Reference docs: [DESIGN.md](DESIGN.md) (the what + why) · [BUILD.md](BUILD.md) (the how + when) · [TODOS.md](TODOS.md) (deferred work)
 
-**Last updated:** 2026-04-08 (late evening)
-**Current phase:** Pre-W1 homework
-**Overall:** Day 0 of ~13 weeks — accounts + tooling done, captain interviews + repo bootstrap remain
+**Last updated:** 2026-04-08 (post-CEO-review)
+**Current phase:** Pre-W1 homework (CEO review complete; W1 P0 list expanded by 1 item)
+**Overall:** Day 0 of ~13 weeks — environment fully set up (accounts, tooling, emulator, repo, GitHub). CEO review complete; reframed thesis + 12 new BUILD.md decisions + 3 doc files updated. Remaining before W1: captain interviews (with 3 new questions), Play Console verification, Naver Band write-scope verification (NEW).
 
 ---
 
 ## 🎯 RIGHT NOW
 
 - [ ] **Complete Google Play Console identity verification** — account is created, ID verification still pending. The 14-day closed-testing clock can't fully start until verification clears. Check your email + the Play Console dashboard for whatever Google is asking for. (Waiting on Google, no action you can take besides responding to whatever they ask.)
-- [ ] **Schedule the 2 captain interviews** (own club only, see scope note below)
+- [ ] **Schedule the 2 captain interviews** (own club only — own captain + own secretary). USE THE NEW SCRIPT in `notes/captain-interview-script.md` — added 2026-04-08 evening as part of CEO review (3 new questions test killer-feature latency vs Daum push, M2 status-quo switching cost, and PIPA notice baseline).
   - Interview A: your own club's captain — date/time scheduled? ___
   - Interview B: your own club's secretary — date/time scheduled? ___
-- [ ] **Repo bootstrap** — the next concrete codable thing. BUILD.md Part 1.4 has the exact commands. ~1 hour. First commit ships, `.gitignore` is already in place protecting `secrets/`. Can do this tonight or tomorrow morning.
+- [ ] **NEW (CEO Decision 24): Naver Band write-scope verification** — 30-90 min research at developers.naver.com. With Module 3 now PROTECTED in MVP (no longer a cut valve), this is load-bearing. If approval-gated, start the application THE SAME DAY as the research. See BUILD.md Part 0.7 for full instructions. Document result in `notes/homework-results.md`.
 
-**Scope note (revised 2026-04-08 evening):** dropped from 3 captain interviews to 2, both from your own club (captain + secretary). This is actually sharper than the original plan because both interviews are about the same multi-manager pair, so you'll see the actual handoff dynamics rather than guessing about strangers. Tradeoff: you lose the "do other clubs have the same pain" signal — captured as a v2 TODO instead.
+**Scope note (revised 2026-04-08 evening, CEO review):** captain interview format kept at 2 own-club only. Module 3 status changed from "cut valve" to "protected" — if you run late, polish + Maestro coverage gets cut, NOT a module. Reframed killer-feature thesis from "shared SoT between two equal managers" → "operations layer for amateur club captains."
 
-**Next time you open this file:** if all three items above are checked, scroll to "📅 NEXT" — W1 gates are up.
+**Next time you open this file:** Play Console verification is the long pole (waiting on Google), but the captain interviews are the gating item before W1 starts. If both are done and the W1 gates haven't been triggered yet, scroll to "📅 NEXT" — W1 gates are up.
 
 ---
 
@@ -67,6 +67,10 @@ Nothing blocked right now. Update this section if a gate fails, an interview rev
 
 Newest first.
 
+- **2026-04-08 (post-late-evening)** — **`/plan-ceo-review` complete.** Mode: SELECTIVE EXPANSION. 6 expansions proposed → 3 accepted + 2 deferred + 1 skipped. 4 cross-model tensions surfaced via outside voice (Claude subagent, codex unavailable) and all resolved by user. **12 new BUILD.md decisions baked in (Decisions 22-33) on top of the existing 21 eng-review decisions.** Major changes: (1) **reframed killer-feature thesis** from "shared SoT between two equal managers" → "operations layer for amateur club captains" — multi-manager is a capability not the headline, M1 leads on demo, M2 is the depth play, M3 is the breadth play; (2) **Module 3 upgraded from W9 cut-valve to PROTECTED in MVP** — new cut valve = polish + Maestro coverage; (3) **Naver Band write-scope verification moved to W1 P0** alongside KIPRIS + captain interviews; (4) **PIPA captain-attestation pattern** added (W2 schema column + W4 UI checkbox + privacy policy section) to address third-party member PII legal exposure surfaced by outside voice; (5) **Sentry moved to W3** (was W11 polish); (6) **GitHub Actions CI added in W3**; (7) **cafe post link button added to W6** (15 min trust escape hatch); (8) **W12-13 acquisition prep block added** (cafe post wording, 홍보 rules, in-app KakaoTalk Sharesheet referral, in-person 60-sec demo script); (9) **Haiku schema decision register baked in** (multi-date posts, 수도권 전체, 오픈/친선, parser_confidence rubric); (10) **member deletion = anonymize pattern** (PIPA-compliant + audit-trail intact). Files changed: BUILD.md (12 new decisions + multiple section updates), DESIGN.md (v3 banner + CEO review section coming next), CLAUDE.md (voice + anti-conventions updated), TODOS.md (5 new entries with sharpened triggers), `notes/captain-interview-script.md` (NEW with 3 new questions). 0 unresolved decisions. ENG + CEO CLEARED.
+- **2026-04-08 (late evening)** — **Design conviction clarified: Libero v1 has zero role-based UI branching.** All users inside a club see identical screens with identical permissions, regardless of whether they're labeled captain or 총무. The captain/secretary distinction is metadata only, not a permission gate. Role-based UI/permission differentiation is explicitly v2 work, deferred until ≥10 active captains complain about 권한 분리. Saved as feedback memory + added to TODOS.md as a v2 entry. The killer-feature framing simplifies to "shared source of truth between two equal managers" — drop the "captain's tool" / "secretary's tool" framings entirely.
+- **2026-04-08 (late evening)** — Confirmed Android emulator is already API 34 (not API 24 as initially feared). No swap needed. Ready for Android testing in W3.
+- **2026-04-08 (late evening)** — **🎉 REPO BOOTSTRAP COMPLETE.** First commit `d75574a init project for Libero` shipped. GitHub remote `https://github.com/hykhyk189/Libero` created as **PRIVATE** and pushed. 79 files tracked: Android Studio template (`kr.libero.captain`, minSdk 26, targetSdk 36, Compose theme scaffolding under `ui/theme/`), Supabase init with 3 edge function stubs, scratchpad scaffolding for W1 gates 1A and 1B, all 5 living docs (DESIGN/BUILD/PROGRESS/TODOS/CLAUDE). **Audited git tracked files for secret leaks: zero hits across `secrets/`, `*.env`, `*-firebase-adminsdk-*.json`, `google-services.json`, `*.keystore`, `*.jks`, captain interview patterns. .gitignore worked.** Day 0 → W1 bridge complete; only captain interviews + Play Console verification gate the start of W1. (Curiosity flagged: `scratchpad/01_scraper_fetch/CLAUDE.md` was auto-generated by `bun init` and got committed; check next session and decide whether to keep or delete.)
 - **2026-04-08 (late evening)** — `.gitignore` audit against BUILD.md Part 1.5 turned up 4 missing critical patterns: `*.keystore`, `*.jks`, `notes/captain-interview-*.md` (PIPA), `scratchpad/02_excel_parse/samples/` (PIPA). Plus `.dev.vars` and top-level `.gradle/`. All added with prominent `🚨 SECRETS` and `🚨 PERSONAL DATA (PIPA)` section banners. BUILD.md Part 1.5 rewritten to point at the actual file as the source of truth instead of duplicating a stale snippet.
 - **2026-04-08 (late evening)** — BUILD.md Part 0.6 patched: added `brew install deno` to local tooling list (Deno binary is required by the Deno VSCode extension and `supabase functions serve`, was missing from the install list and only surfaced when the user hit the Deno LSP error during repo bootstrap). `.gitignore` updated to track `.vscode/settings.json` (Supabase-generated Deno LSP scope is shared project state, not personal IDE prefs).
 - **2026-04-08 (late evening)** — `.gitignore` created at project root with three layers of secret protection (`secrets/`, `google-services.json`, `*-firebase-adminsdk-*.json`). Repo bootstrap can now safely `git add .` without leaking credentials.
@@ -90,7 +94,7 @@ Newest first.
 ## 📊 OVERALL PROGRESS
 
 ```
-Pre-W1 homework  ████████░░  Day 0 (KIPRIS ✓, Play Console ✓ pending verify, tester list ✓, accounts ✓, tooling ✓ — captain interviews + repo bootstrap remain)
+Pre-W1 homework  █████████░  Day 0 (KIPRIS ✓, Play Console ✓ pending verify, tester list ✓, accounts ✓, tooling ✓, repo bootstrap ✓ + GitHub push — only captain interviews remain)
 W1 Gates         ░░░░░░░░░░  not started
 W2 Backend       ░░░░░░░░░░  not started
 W3 Android       ░░░░░░░░░░  not started
@@ -104,7 +108,7 @@ LIVE             ░░░░░░░░░░  not started
 
 **Major milestones with dates as you hit them:**
 - [ ] First captain interview done — date: ___
-- [ ] First commit pushed — date: ___
+- [x] First commit pushed — **2026-04-08** (commit `d75574a`, pushed to private GitHub remote `hykhyk189/Libero`)
 - [ ] W1 all 5 gates passed — date: ___
 - [ ] W3 sign-in works on real Galaxy — date: ___
 - [ ] W7 push notification → instant detail screen working on real device — date: ___

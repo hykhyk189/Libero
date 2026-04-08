@@ -1,0 +1,95 @@
+# ============================================
+# 🚨 SECRETS — never commit these
+# ============================================
+secrets/
+*.env
+*.env.*
+!*.env.example
+.dev.vars
+local.properties
+google-services.json
+*-firebase-adminsdk-*.json
+*.keystore
+*.jks
+
+# ============================================
+# 🚨 PERSONAL DATA (PIPA) — never commit these
+# ============================================
+# Captain interview transcripts contain personal data about real humans.
+notes/captain-interview-*.md
+# Real KakaoBank Excel exports contain member names + financial transactions.
+scratchpad/02_excel_parse/samples/
+
+# ============================================
+# Android
+# ============================================
+android/build/
+android/app/build/
+android/.gradle/
+android/.idea/
+android/captures/
+android/.cxx/
+android/local.properties
+android/app/release/
+*.iml
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+
+# ============================================
+# Gradle (top-level — catches scratchpad gradle dirs)
+# ============================================
+.gradle/
+
+# ============================================
+# Bun / Node (for scratchpad + edge functions)
+# ============================================
+node_modules/
+.bun/
+dist/
+*.tsbuildinfo
+
+# ============================================
+# Supabase CLI
+# ============================================
+supabase/.temp/
+supabase/.branches/
+
+# ============================================
+# macOS
+# ============================================
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ============================================
+# IDE
+# ============================================
+# Track .vscode/settings.json (Supabase Deno LSP scope) and extensions.json,
+# ignore everything else under .vscode/ (per-developer prefs).
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ============================================
+# Logs
+# ============================================
+*.log
+npm-debug.log*
+bun-debug.log*
+
+# ============================================
+# Build artifacts
+# ============================================
+build/
+out/

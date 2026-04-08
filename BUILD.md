@@ -48,7 +48,7 @@ This file was further revised after a `/plan-ceo-review` pass + outside voice re
 |---|---|---|
 | 22 | **Reframed killer-feature thesis: "operations layer for amateur club captains," NOT "shared source of truth between two equal managers"** | Multi-manager scaffolding is only load-bearing for Module 2. Module 1 and Module 3 work fine single-user. The reframe narrows the headline; multi-manager is now a *capability*, not the *thesis*. CV story: M1 leads on demo, M2 is the depth play (Excel-over-OCR product judgment), M3 is the breadth play. |
 | 23 | **Module 3 (Band auto-post) is PROTECTED in MVP — no longer the cut valve** | Outside voice surfaced that the reframed thesis is hollow at MVP if M3 cuts. New cut valve = polish + Maestro coverage. If you run late, you ship with thinner test coverage and rougher polish, NOT a missing module. |
-| 24 | **Naver Band write-scope verification moved from W9 to W1 P0** (was Decision 17) | If approval-gated, USER must start the application same-day as the W1 research. With M3 protected (Decision 23), there's no fallback if approval doesn't clear by W10. 30-90 min research at developers.naver.com. |
+| 24 | **Naver Band write-scope verification moved from W9 to W1 P0** (was Decision 17) | If approval-gated, USER must start the application same-day as the W1 research. With M3 protected (Decision 23), there's no fallback if approval doesn't clear by W10. 30-90 min research at **developers.band.us** (Band Open API has its own portal — NOT developers.naver.com). |
 | 25 | **PIPA captain-attestation pattern for member PII** | Outside voice flagged that the captain's consent flow doesn't address members' PII. New W2 schema column `members.notice_acknowledged_at`, W4 UI checkbox, privacy policy section. Implements PIPA legitimate-interest basis with notice. Real legal de-risking. |
 | 26 | **DESIGN.md updated to v3 to mirror BUILD.md** | DESIGN.md was stale relative to BUILD.md in 8 places (Hilt, Room, Cloudflare, App Links, domain, multi-manager thesis, reviewer concerns, cost table). User chose: BUILD.md is the source of truth on tech, DESIGN.md gets aligned. Done in CEO review outputs. |
 | 27 | **Sentry moved from W11 polish to W3 alongside Android scaffold** | W11 polish is the busiest week and Sentry frequently gets skipped under pressure. ~30 min to add SDK + 1-line init in W3 instead. Free tier covers MVP. |
@@ -154,16 +154,27 @@ You need this for FCM and Sign in with Google. Same Google account as Play Conso
 
 **Do this in W1 alongside KIPRIS + captain interviews. With Module 3 protected (Decision 23), there is no fallback if Naver Band's write scope is approval-gated and approval doesn't clear by W10.**
 
-1. Go to https://developers.naver.com/apps/#/list — register a new app called "리베로" (or 리베로 캡틴 if KIPRIS forced a fallback)
-2. Add the **Band Open API** product to the app
-3. Look for the available scopes — specifically the **write** / **post** scope (the one that lets you create new Band posts on behalf of the user)
-4. Try to enable it. The flow tells you one of three things:
-   - **Self-serve:** scope toggles on immediately, you have it. Document this in `notes/homework-results.md`. Module 3 is unblocked.
-   - **Approval-gated with form:** Naver shows you a Korean approval form. **Fill it out same-day.** The form typically asks for the use case, expected daily volume, and screenshots/mockups. Use the BUILD.md Module 3 description as the use case. Document the submission in `notes/homework-results.md` and check back daily. Approval typically takes 1-4 weeks.
-   - **Business-entity required:** Naver requires a 사업자등록번호 to grant the scope. **This is a strategic problem.** Options: (a) accept Module 3 ships with manual clipboard-paste fallback only (no auto-post), and re-add the API integration in v1.1 once you start 사업자등록 in month 3 if usage justifies the freemium pivot; (b) ship with a different mechanism (e.g., Naver Band Open API has historically also supported posting via the user's own Band Personal API token — investigate); (c) skip Module 3 entirely. Document the choice in `notes/homework-results.md`.
-5. **Failure mode:** if Naver Developers portal is down or you can't find the Band product anywhere, write that in `notes/homework-results.md` and escalate via developers.naver.com support email.
+> **Portal note:** the Band Open API has its own developer portal at **`https://developers.band.us/`** — it is **not** part of `developers.naver.com`. Don't waste time on developers.naver.com looking for a "Band product" to add; it isn't there. The two are separate Naver properties with separate registration flows, separate scope lists, and separate review queues.
 
-**Pass criteria:** you have a definitive answer on whether Module 3's auto-post is achievable in MVP. The answer is recorded in `notes/homework-results.md`. If approval-gated, the application is submitted same-day.
+1. Go to https://developers.band.us/ and sign in with the Naver account that will own the auto-post in production. The Band Open API authorizes per-user, so the captain account that operates the test Band group MUST be the one that registers the app and clicks through the OAuth consent screen later — using a different Naver ID here means re-doing the consent flow in W10.
+2. Open **My Applications** (내 애플리케이션) and click **Create App** (앱 만들기 / 애플리케이션 등록). Required fields are typically:
+   - **App name:** `리베로` (or `리베로 캡틴` if KIPRIS forced a fallback)
+   - **Service URL:** placeholder is fine for now (e.g., `https://libero.kr.placeholder` — no domain purchase, see anti-conventions)
+   - **Redirect URI:** placeholder you control (e.g., `https://libero.local/oauth/callback`). The real Android deep-link URI gets added in W10 when the OAuth screen is wired up.
+3. Once the app is created, save the **Client ID** and **Client Secret** into `notes/homework-results.md`. **Do NOT commit them.** They will move to `local.properties` (already gitignored) once the Android project exists in Part 1.
+4. On the app's settings page, find the **scope / permission list** (권한 / scope). Specifically look for the scope that lets you create posts on behalf of the user — historically named **`WRITE_POST`** ("글 작성 권한"). Read the row carefully; the flow tells you one of three things:
+   - **Self-serve:** the scope is listed and you can tick it (or it's granted by default). Save, and you have it. Document this in `notes/homework-results.md`. Module 3 is unblocked.
+   - **Approval-gated with form:** the scope is locked and selecting it triggers a Korean approval form. **Fill it out same-day.** The form typically asks for: use case description, expected daily/monthly post volume, target user count, and screenshots/mockups. Use the BUILD.md Module 3 description as the use case (Korean amateur volleyball captain auto-posting weekly attendance polls to her own Band group; <100 posts/day across all users in MVP). Document the submission in `notes/homework-results.md` and check back daily — approval typically takes 1-4 weeks.
+   - **Business-entity required:** the form (or a banner near the scope) demands a 사업자등록번호 to grant the scope. **This is a strategic problem.** Options: (a) accept Module 3 ships with manual clipboard-paste fallback only (no auto-post), and re-add the API integration in v1.1 once you start 사업자등록 in month 3 if usage justifies the freemium pivot; (b) skip the auto-post leg of M3 and ship configuration-only ("set the schedule, get notified at the right time to paste"); (c) skip Module 3 entirely. Document the choice in `notes/homework-results.md`.
+5. **Smoke test the consent screen** (5 min, no code). Open this URL in a browser, replacing the two placeholders, to confirm the app is live and the scope you ticked actually appears on the Korean consent screen:
+   ```
+   https://auth.band.us/oauth2/authorize?response_type=code&client_id=<YOUR_CLIENT_ID>&redirect_uri=<YOUR_REDIRECT_URI>&scope=WRITE_POST
+   ```
+   - If the consent screen loads and lists "글 작성" (or `WRITE_POST`) in the requested permissions — you're good. Approve it once to verify the redirect lands; the resulting `code` query param confirms the OAuth flow works end-to-end.
+   - If it errors with `invalid_scope` / `unauthorized_scope` / silently drops the scope — the scope is not actually granted to your app. You're in case (b) or (c) of step 4 even if the settings page made it look enabled.
+6. **Failure mode:** if developers.band.us is down, the scope row isn't visible anywhere, or the smoke test fails ambiguously, write what you saw (with screenshots) in `notes/homework-results.md` and escalate via the developers.band.us help / contact form. Do NOT email developers.naver.com — wrong portal, wrong queue.
+
+**Pass criteria:** you have a definitive answer on whether Module 3's auto-post is achievable in MVP. The answer is recorded in `notes/homework-results.md`. Client ID + Secret are saved (NOT committed). If approval-gated, the application is submitted same-day. If the smoke test in step 5 succeeded, you have a verified `WRITE_POST` consent screen and Module 3 is unblocked.
 
 ### 0.6 Local tooling (30-60 min, $0)
 
@@ -1116,7 +1127,7 @@ Pin these to your wall.
 | W1 Gate 1C pass | end of W1 | FCM doesn't deliver on Samsung battery opt → mandatory in-app guide screen for 잠자지 않는 앱 |
 | W1 Gate 1D pass | end of W1 | Credential Manager doesn't work on Korean OEM → fall back to legacy GoogleSignInClient |
 | W1 Gate 1E pass | end of W1 | Supabase latency from Korea unacceptable → keep dispatch warm via heartbeat cron |
-| **Naver Band write scope verified (Part 0.7 — verified W1)** | **end of W1, escalation if unclear by W9** | **Approval-gated and unclear by W9 → escalate via Naver Developer support; ship M3 with manual clipboard-paste implementation and add API in v1.1. M3 is PROTECTED, not cut (CEO Decision 23).** |
+| **Naver Band write scope verified (Part 0.7 — verified W1)** | **end of W1, escalation if unclear by W9** | **Approval-gated and unclear by W9 → escalate via developers.band.us help / contact form (NOT developers.naver.com — wrong portal); ship M3 with manual clipboard-paste implementation and add API in v1.1. M3 is PROTECTED, not cut (CEO Decision 23).** |
 | Captain interview surfaces something that breaks the design | before W2 starts | Re-run /office-hours with new info, update DESIGN.md before continuing |
 | `time_from_post_to_notification` metric in production | first month after launch | Routinely >3h → revisit polling cadence trade-off (and the personal Daum account risk) |
 | 3-hour polling vs 30-min reconsideration | after first month of usage | If captains report "I'm getting these too late" → bump cadence to 30min, accept slight Daum stealth risk |

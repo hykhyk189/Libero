@@ -4,7 +4,7 @@
 >
 > Reference docs: [DESIGN.md](DESIGN.md) (the what + why) · [BUILD.md](BUILD.md) (the how + when) · [TODOS.md](TODOS.md) (deferred work)
 
-**Last updated:** 2026-04-08 (post-CEO-review)
+**Last updated:** 2026-04-08 (post-CEO-review; 0.7 portal corrected to developers.band.us)
 **Current phase:** Pre-W1 homework (CEO review complete; W1 P0 list expanded by 1 item)
 **Overall:** Day 0 of ~13 weeks — environment fully set up (accounts, tooling, emulator, repo, GitHub). CEO review complete; reframed thesis + 12 new BUILD.md decisions + 3 doc files updated. Remaining before W1: captain interviews (with 3 new questions), Play Console verification, Naver Band write-scope verification (NEW).
 
@@ -16,7 +16,7 @@
 - [ ] **Schedule the 2 captain interviews** (own club only — own captain + own secretary). USE THE NEW SCRIPT in `notes/captain-interview-script.md` — added 2026-04-08 evening as part of CEO review (3 new questions test killer-feature latency vs Daum push, M2 status-quo switching cost, and PIPA notice baseline).
   - Interview A: your own club's captain — date/time scheduled? ___
   - Interview B: your own club's secretary — date/time scheduled? ___
-- [ ] **NEW (CEO Decision 24): Naver Band write-scope verification** — 30-90 min research at developers.naver.com. With Module 3 now PROTECTED in MVP (no longer a cut valve), this is load-bearing. If approval-gated, start the application THE SAME DAY as the research. See BUILD.md Part 0.7 for full instructions. Document result in `notes/homework-results.md`.
+- [ ] **NEW (CEO Decision 24): Naver Band write-scope verification** — 30-90 min research at **developers.band.us** (the Band Open API has its own portal — NOT developers.naver.com). With Module 3 now PROTECTED in MVP (no longer a cut valve), this is load-bearing. If approval-gated, start the application THE SAME DAY as the research. See BUILD.md Part 0.7 for full instructions. Document result in `notes/homework-results.md`.
 
 **Scope note (revised 2026-04-08 evening, CEO review):** captain interview format kept at 2 own-club only. Module 3 status changed from "cut valve" to "protected" — if you run late, polish + Maestro coverage gets cut, NOT a module. Reframed killer-feature thesis from "shared SoT between two equal managers" → "operations layer for amateur club captains."
 

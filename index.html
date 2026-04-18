@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>리베로 (Libero) — 배구 동호회 캡틴 도구</title>
+  <meta name="description" content="아마추어 9인제 배구 동호회 주장(캡틴)을 위한 Android 앱. 토너먼트 일정, 회비, 출석을 관리합니다.">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      max-width: 640px;
+      margin: 48px auto;
+      padding: 0 24px;
+      line-height: 1.75;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    .subtitle { color: #666; margin-top: 0; margin-bottom: 32px; }
+    h2 { font-size: 18px; margin-top: 32px; }
+    a { color: #0066cc; }
+    footer { margin-top: 48px; color: #888; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>리베로 (Libero)</h1>
+  <p class="subtitle">아마추어 9인제 배구 동호회 캡틴을 위한 Android 앱</p>
+
+  <h2>소개</h2>
+  <p>리베로는 한국 아마추어 9인제 배구 동호회 주장(캡틴)과 총무가 토너먼트 일정, 회비 관리, 출석 확인을 한곳에서 처리할 수 있도록 돕는 Android 앱입니다.</p>
+
+  <h2>주요 기능</h2>
+  <ul>
+    <li><strong>토너먼트 알림:</strong> Daum 카페에 새로운 토너먼트 공고가 올라오면 자동으로 푸시 알림을 보냅니다.</li>
+    <li><strong>회비 대사:</strong> KakaoBank 엑셀 명세서를 업로드하면 입금 내역을 자동으로 매칭해 줍니다.</li>
+    <li><strong>밴드 자동 게시:</strong> 동호회 밴드에 주간 출석 체크 게시물을 원하는 시간에 자동으로 올려 줍니다.</li>
+  </ul>
+
+  <h2>Band Open API 사용</h2>
+  <p>리베로는 캡틴이 본인이 운영하는 동호회 밴드에 주간 출석 체크 게시물을 자동으로 올릴 수 있도록 Band Open API의 글 작성 권한(WRITE_POST)을 사용합니다. 사용자는 OAuth 동의 화면에서 본인의 밴드를 선택하고 권한을 명시적으로 허용한 경우에만 글이 게시됩니다.</p>
+
+  <h2>현재 상태</h2>
+  <p>포트폴리오 프로젝트로 개발 중이며, Google Play Console 비공개 테스트를 준비하고 있습니다. MVP 기준 예상 사용자 50-100명, 일일 자동 게시 수 100건 이하로 제한됩니다.</p>
+
+  <footer>
+    개발자 문의: <a href="mailto:hanyoung189@gmail.com">hanyoung189@gmail.com</a>
+  </footer>
+</body>
+</html>

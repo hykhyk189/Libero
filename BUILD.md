@@ -63,6 +63,25 @@ These decisions ALL stand alongside the original 21 eng-review decisions. None o
 
 ---
 
+## Interview Re-anchor Decision Log (2026-04-17)
+
+After both own-club captain interviews completed on 2026-04-17, a `/plan-ceo-review` re-anchor session surfaced 8 new decisions. Findings synthesized in `notes/captain-interview-synthesis.md`. Raw intake in `notes/captain-interview-combined.md`. None of the prior 33 decisions are overridden; several are *sharpened* (M1 framing, M2 scope). Multi-manager premise re-confirmed (Decision 40).
+
+| # | Decision | Rationale |
+|---|---|---|
+| 34 | **Members schema gains 6 columns: `birth_date DATE`, `gender CHAR(1)`, `address TEXT`, `phone TEXT`, `jersey_size TEXT`, `jersey_number INT`.** All nullable. | Captain explicitly tracks these in their current Excel. The "excel replacement" UX promise requires storing them. W4 captain-attestation checkbox (Decision 25) covers the PIPA notice for all 6. Privacy policy field list (W11 hosting) gets updated to name them. |
+| 35 | **주민번호 processing policy: store `birth_date` + `gender` separately, never as a 7-char or 13-char concatenation. Never collect full 13-digit 주민등록번호.** | The captain's Excel "주민번호" column is first-7-digits (생년월일 + 성별 indicator) — 일반 개인정보 under PIPA, not 고유식별정보. Splitting into two columns eliminates the naming implication that the rest exists. Full 13-digit 주민등록번호 is 고유식별정보 (PIPA Article 24-2) and requires statutory basis Libero doesn't have — never collect it. If the 30-sec captain confirmation finds their Excel actually has full 13, revisit the Drive-backed architecture option. |
+| 36 | **M2 center-of-gravity pivots from "monthly dues parser" to "reference-matched deposit classifier."** New table `payment_references (id, club_id, label, amount, tournament_id NULL, cycle_id NULL, active, created_at, deactivated_at)`. Captain curates reference pairs like "월회비 = 50,000원" or "대전 대회비 = 20,000원". Import matches each transaction by exact amount against active references. | Captain interview: "생각보다 월회비 내는 사람의 비율이 적음 (40명 중 20~30명이 연회비를 냄) → 매월 회비관리 자체는 부담 적음. 보통 대회/회식 같은 1회성 이벤트일 때 신경이 더 많이 쓰임." Monthly dues are low-volume; per-event (tournaments, dinners) is the real pain. Reference table is the user's curated source of truth — user-invented mechanism that cleanly unifies monthly dues, tournament fees, and one-off events as a single concept. |
+| 37 | **Reference-matching algorithm: amount-first deterministic match, human-confirmation on every row, Haiku is tiebreaker-only.** Flow: exact amount → 1 active reference = pre-fill with yes/no confirm button; multiple matches = prompt with options (Haiku-disambiguated via memo text if available, never auto-committed); zero matches = manual "분류 안됨" assignment. Fuzzy name-match (≥0.85 Levenshtein) runs separately against roster per original Decision 21. | Captain requested "AI가 금액 보고 분석" with final human confirmation. Grounding classification in a user-curated reference table (rather than open-ended LLM labeling) eliminates hallucination surface. CV story sharpens: "I constrained LLM classification to a user-curated reference table to eliminate hallucination." |
+| 38 | **M2 input source stays Excel-only for v1. NotificationListenerService parked to TODOs.** | Captain floated reading KakaoBank push notifications directly via Android `NotificationListenerService`. Play Store restricts the permission to "core use case" apps (screen readers, SMS backup, car dash) — general finance apps have had approvals revoked. Reference-matching algorithm is future-compatible with a notification-listener input if it becomes viable in v1.1+, but v1 ships with Excel upload only. |
+| 39 | **Attendance tracking = v1.1 M3 extension, RSVP scope only. NOT a new module.** | Captain asked "출석률 체크할 수 있으면 좋겠다 ... (밴드) 댓글 확인해서 출석률 반영?" After v1 ships, M3 extends to read the auto-posted poll's comment thread, map yes-RSVPs to members, produce attendance-rate view. This is RSVP (who said yes), not true attendance (who physically showed up). True attendance (captain-marks-present UI at the gym) stays v2+. Framing as M3 extension preserves the 3-module MVP narrative. |
+| 40 | **Multi-manager premise RE-CONFIRMED (no plan change).** | Both own-club captain and secretary described overlapping workflows independently. DESIGN.md Premise 2 holds. The existing multi-manager scope decisions (filtered Realtime, invite codes, zero role-based UI branching) stand. This decision exists as a premise re-validation audit entry, not a plan change. |
+| 41 | **M1 demo framing VALIDATED (no plan change).** | Captain has Daum cafe app push notifications enabled. CEO Decision 22 had already reframed M1 from "fastest source" to "filter + structured data + one-tap Band draft" (DESIGN.md line 61) — the interview confirms this was correct. Demo video script leads with the filter/structure/one-tap narrative, NOT "you got pushed first." |
+
+These decisions stand alongside the 33 prior decisions. None overrides prior decisions; several refine scope (M2 grows by the reference-matching mechanism, members schema grows by 6 columns, attendance placement is locked to v1.1-as-M3-extension).
+
+---
+
 ## Part 0: The Day-1 Setup (~3-4 hours, do this BEFORE you open Android Studio)
 
 Order matters. Some of these unlock others. Some have clocks that start ticking the moment you click the button. **The first three items are PRIORITY 0 — do them tonight before anything else.**
@@ -561,6 +580,19 @@ All 5 gates pass (or fallbacks work and are documented). 20 real Daum posts capt
   -- Captain attests in W4 UI that she has informed this member that their info
   -- is stored for dues management. Required by PIPA legitimate-interest basis.
   ```
+- **Interview Re-anchor Decision 34 — 6 new member fields** (added 2026-04-17): in `20260408000000_init_schema.sql`, `members` table also gets:
+  ```sql
+  ALTER TABLE members ADD COLUMN birth_date date NULL;
+  ALTER TABLE members ADD COLUMN gender char(1) NULL;          -- 'M' | 'F' | NULL (not 주민번호 7자리 concatenated)
+  ALTER TABLE members ADD COLUMN address text NULL;
+  ALTER TABLE members ADD COLUMN phone text NULL;
+  ALTER TABLE members ADD COLUMN jersey_size text NULL;         -- "S" | "M" | "L" | "XL" | custom
+  ALTER TABLE members ADD COLUMN jersey_number int NULL;
+  -- DO NOT add a column named `jumin_front_7` or similar. Naming implies the
+  -- rest of the 주민등록번호 exists, which it does not. The two columns above
+  -- (birth_date + gender) store everything the captain's current Excel tracks.
+  ```
+  All 6 are nullable — captain/secretary can leave them blank per member. W4 attestation checkbox (Decision 25) covers the PIPA notice for all 6 fields collectively. The privacy policy section "회원 정보 처리" expands to name each field.
   Plus a member-anonymization function (NOT cascade delete, NOT soft delete):
   ```sql
   CREATE OR REPLACE FUNCTION anonymize_member(p_member_id uuid)
@@ -590,6 +622,23 @@ All 5 gates pass (or fallbacks work and are documented). 20 real Daum posts capt
   ```
 - `supabase/migrations/20260408000005_dispatch_trigger.sql` — Postgres trigger on `tournaments` insert that calls `dispatch_tournament_match` Edge Function via pg_net
 - `supabase/migrations/20260408000006_pg_cron_scraper.sql` — pg_cron entry that invokes `scrape_daum_cafe` Edge Function every 3 hours
+- `supabase/migrations/20260417000000_payment_references.sql` — **Interview Re-anchor Decision 36.** Reference-matched deposit classifier table:
+  ```sql
+  create table payment_references (
+    id uuid primary key default gen_random_uuid(),
+    club_id uuid not null references clubs(id) on delete cascade,
+    label text not null,                              -- "월회비", "대전 대회비", "4월 회식비"
+    amount int not null,                              -- KRW, exact match target
+    tournament_id uuid null references tournaments(id) on delete set null,
+    cycle_id uuid null references payment_cycles(id) on delete set null,
+    active boolean not null default true,
+    created_at timestamptz not null default now(),
+    deactivated_at timestamptz null
+  );
+  create index payment_references_lookup on payment_references (club_id, active, amount);
+  -- RLS: club_managers can SELECT/INSERT/UPDATE/DELETE where club_id matches their club
+  ```
+  Creating a reference with `tournament_id` set should trigger app-layer creation of a matching `payment_cycles` row (visible + debuggable in app logs). Deactivating a reference (set `active = false`, `deactivated_at = now()`) does NOT delete historical classifications — they're immutable audit-safe.
 - `supabase/seed.sql` — seed `subscription_tiers` with `free` (active) + `pro` (defined, no checkout)
 - `supabase/tests/01_clubs_rls.sql` — anonymous user cannot read clubs, manager A cannot read manager B's club, etc.
 - `supabase/tests/02_members_rls.sql` — same RLS test pattern for members
@@ -937,28 +986,31 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
 
 ---
 
-### Week 8 — Module 2.A: Payment Cycles + Manual Tracking + Realtime Sync
+### Week 8 — Module 2.A: Payment Cycles + Payment References + Manual Tracking + Realtime Sync
 
-**Goal:** secretary creates a payment cycle, sees the member roster with paid/unpaid toggles, can mark payments by hand. Two managers see each other's edits within 2 seconds via filtered Realtime.
+**Goal:** captain/secretary creates payment references AND cycles, sees the member roster with paid/unpaid toggles, can mark payments by hand. Two managers see each other's edits within 2 seconds via filtered Realtime.
 
 **Files:**
 - `android/app/src/main/java/kr/libero/captain/payments/PaymentCycleListScreen.kt`
 - `android/app/src/main/java/kr/libero/captain/payments/CreatePaymentCycleScreen.kt`
 - `android/app/src/main/java/kr/libero/captain/payments/PaymentCycleDetailScreen.kt`
-- `android/app/src/main/java/kr/libero/captain/payments/PaymentRepository.kt` — Supabase reads/writes for `payment_cycles` and `member_payments`, with **filtered realtime subscription** keyed by club_id
-- **CEO Decision 25 — PIPA captain attestation in MembersScreen.kt:** the add-member form includes a required checkbox "회원에게 정보 저장 사실을 알렸습니다 (PIPA 고지 의무)". The Submit button is disabled until the checkbox is checked. On submit, persist `members.notice_acknowledged_at = now()`. The checkbox cannot be auto-checked or pre-checked — captain has to actively tap it each time. This is the user-facing PIPA legitimate-interest notice mechanism.
-- `android/app/src/main/java/kr/libero/captain/members/MembersScreen.kt` — CRUD for `members`
+- `android/app/src/main/java/kr/libero/captain/payments/PaymentRepository.kt` — Supabase reads/writes for `payment_cycles`, `member_payments`, AND `payment_references`, with **filtered realtime subscription** keyed by club_id
+- **Interview Re-anchor Decision 36 — reference-table UI:**
+  - `android/app/src/main/java/kr/libero/captain/payments/PaymentReferencesScreen.kt` — list of active references (label + amount + optional tournament link + active toggle). CRUD actions: add / edit / deactivate. Deactivation is soft (sets `active = false, deactivated_at = now()`) to preserve audit trail of past classifications.
+  - `android/app/src/main/java/kr/libero/captain/payments/CreatePaymentReferenceScreen.kt` — form: `label` (required text), `amount` (required int), `tournament_id` (optional dropdown of upcoming tournaments from M1's tournaments table). Submitting with `tournament_id` set auto-creates a matching `payment_cycles` row linked by `cycle_id`.
+- **CEO Decision 25 — PIPA captain attestation in MembersScreen.kt:** the add-member form includes a required checkbox "회원에게 정보 저장 사실을 알렸습니다 (PIPA 고지 의무)". The Submit button is disabled until the checkbox is checked. On submit, persist `members.notice_acknowledged_at = now()`. The checkbox cannot be auto-checked or pre-checked — captain has to actively tap it each time. This is the user-facing PIPA legitimate-interest notice mechanism. **Interview Re-anchor Decision 34:** the same form now also includes optional fields `birth_date` (date picker), `gender` (M/F/blank radio), `address`, `phone`, `jersey_size`, `jersey_number` — all nullable. The single attestation checkbox covers all 7 optional fields collectively.
+- `android/app/src/main/java/kr/libero/captain/members/MembersScreen.kt` — CRUD for `members` (now with extended fields)
 - `android/app/src/main/java/kr/libero/captain/members/MemberRepository.kt`
 
-**Demo at end of W8:** create cycle "2026년 5월 회비 50,000원", add 10 fake members, mark some paid manually. Two phones showing the same cycle update each other within 2 seconds.
+**Demo at end of W8:** create references "월회비 50,000원", "5월 XX대회비 25,000원 (linked to tournament)". Create cycles (the tournament-linked reference auto-creates its cycle). Add 10 fake members with the extended fields filled in. Mark some paid manually. Two phones showing the same references + cycles update each other within 2 seconds. Edit a reference, deactivate another — both changes mirror in real time.
 
-**Gate to W9:** manual flow works, filtered realtime works, conflict (last-write-wins) is silent and correct.
+**Gate to W9:** manual flow works, reference table CRUD works, creating a tournament-linked reference auto-creates the cycle, filtered realtime works for all three tables (`payment_references`, `payment_cycles`, `member_payments`), conflict (last-write-wins) is silent and correct.
 
 ---
 
-### Week 9 — Module 2.B: Excel Upload + Fuzzy Match + Alias Dict
+### Week 9 — Module 2.B: Excel Upload + Reference-Matched Classification + Fuzzy Name Match + Alias Dict
 
-**Goal:** secretary uploads a real KakaoBank `.xlsx`, app parses on-device on background coroutine, fuzzy-matches names against members + alias dict, auto-marks confident matches, surfaces ambiguous matches for confirmation.
+**Goal:** captain/secretary uploads a real KakaoBank `.xlsx`, app parses on-device on background coroutine. Each transaction goes through TWO passes: (1) **amount-matched reference classification** (Interview Re-anchor Decisions 36+37) determines what the deposit is FOR (월회비 / 대회비 / etc.), (2) **fuzzy name-match** against roster + alias dict determines WHO paid. Every row requires human confirmation — no silent auto-commits.
 
 **Files:**
 - `android/app/src/main/java/kr/libero/captain/payments/excel/ExcelImportScreen.kt` — uses `ActivityResultContracts.OpenDocument()` for SAF
@@ -987,8 +1039,12 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
       }
   }
   ```
-- `android/app/src/main/java/kr/libero/captain/payments/excel/FuzzyMatcher.kt` — hand-rolled normalized Levenshtein, 0.85 threshold, **THE LOAD-BEARING BUSINESS LOGIC**
-- `android/app/src/main/java/kr/libero/captain/payments/excel/MatchConfirmationSheet.kt` — bottom sheet "X auto-matched, Y need confirmation", per-row member picker
+- `android/app/src/main/java/kr/libero/captain/payments/excel/ReferenceMatcher.kt` — **Interview Re-anchor Decision 37, PRIMARY CLASSIFIER.** For each `ParsedTransaction`, query active `payment_references` for `club_id` where `amount = tx.amount`. Outcomes:
+  - 1 match → `ClassifiedTransaction(reference=ref, confidence="exact")`. UI pre-fills the label, user clicks [예]/[아니오].
+  - ≥2 matches (same amount across references) → `ClassifiedTransaction(candidates=[ref1, ref2, ...], confidence="ambiguous")`. UI shows a picker. Haiku may disambiguate using `tx.memo` text if present — but NEVER auto-commits. User always confirms.
+  - 0 matches → `ClassifiedTransaction(reference=null, confidence="unknown")`. UI shows "분류 안됨" and offers "Add as new reference" + "Mark as other" options.
+- `android/app/src/main/java/kr/libero/captain/payments/excel/FuzzyMatcher.kt` — hand-rolled normalized Levenshtein, 0.85 threshold, **NAME-MATCHING LOAD-BEARING BUSINESS LOGIC**. Runs AFTER the reference matcher.
+- `android/app/src/main/java/kr/libero/captain/payments/excel/MatchConfirmationSheet.kt` — bottom sheet showing each transaction row with two columns: reference-match outcome (pre-filled or picker or "분류 안됨") + name-match outcome (auto or picker). Yes/no confirmation required on every row. Summary at top: "A auto-classified, B need reference pick, C unknown deposits, D need name confirmation."
 - `android/app/src/main/java/kr/libero/captain/payments/excel/AliasRepository.kt` — writes to `member_aliases` on confirmation
 - **FuzzyMatcher unit tests** — REQUIRED ★★★ coverage:
   - identical Korean strings → 1.0
@@ -1001,9 +1057,9 @@ for f in supabase/tests/*.sql; do psql "$(supabase status -o env | grep DB_URL |
 - `android/app/src/test/java/kr/libero/captain/payments/excel/FuzzyMatcherTest.kt` — JUnit 5 tests
 - `android/maestro/04_payment_excel_import.yaml`
 
-**Demo at end of W9:** upload a real KakaoBank export. App parses on-device on background thread (UI doesn't freeze). Shows "12 auto-matched, 3 need confirmation". Tap the 3, assign each to a member. Re-upload next month's file → all 15 auto-match.
+**Demo at end of W9:** with references configured from W8 ("월회비 50,000원", "5월 XX대회비 25,000원"), upload a real KakaoBank export. App parses on-device on background thread (UI doesn't freeze). Confirmation sheet shows: "12 auto-classified (월회비), 4 auto-classified (대회비), 2 need reference pick, 1 unknown deposit. All 19 need name confirmation." Tap through each row, confirm reference + name. Re-upload next month's file with the same references active → all 19 auto-pre-fill for one-tap yes/no confirmation.
 
-**Gate to W10:** real export from your secretary auto-matches at ≥80% on first run. FuzzyMatcher unit tests have ★★★ coverage on Korean Hangul edge cases.
+**Gate to W10:** real export from your secretary produces reference-match at 100% for transactions whose amount matches an active reference; fuzzy name-match at ≥80% on first run per original acceptance criteria. FuzzyMatcher unit tests have ★★★ coverage on Korean Hangul edge cases. ReferenceMatcher unit tests cover: exact-match single reference, ambiguous multi-reference, zero-match unknown, deactivated-reference-ignored.
 
 ---
 

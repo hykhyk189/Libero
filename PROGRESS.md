@@ -4,41 +4,27 @@
 >
 > Reference docs: [DESIGN.md](DESIGN.md) (the what + why) · [BUILD.md](BUILD.md) (the how + when) · [TODOS.md](TODOS.md) (deferred work)
 
-**Last updated:** 2026-04-08 (post-CEO-review; 0.7 portal corrected to developers.band.us)
-**Current phase:** Pre-W1 homework (CEO review complete; W1 P0 list expanded by 1 item)
-**Overall:** Day 0 of ~13 weeks — environment fully set up (accounts, tooling, emulator, repo, GitHub). CEO review complete; reframed thesis + 12 new BUILD.md decisions + 3 doc files updated. Remaining before W1: captain interviews (with 3 new questions), Play Console verification, Naver Band write-scope verification (NEW).
+**Last updated:** 2026-04-18 (Band app resubmitted; 주민번호 first-7 confirmed by captain; waiting on Band + Play Console)
+**Current phase:** Pre-W1 homework (captain interviews DONE 2026-04-17; 주민번호 first-7 CONFIRMED 2026-04-18; Play Console pending; Naver Band app resubmitted 2026-04-18 with GitHub Pages URLs + Korean naming + Android service type)
+**Overall:** Day 9 of ~13 weeks (calendar) — environment fully set up and both captain interviews complete. Key findings: multi-manager premise confirmed; 주민번호 in club Excel is first-7-only (PIPA general info, not 고유식별정보); Supabase architecture preserved (Drive pivot considered and rejected); members schema grows by ~5 fields. Remaining before W1: Play Console verification (waiting on Google), Naver Band write-scope verification, 3 plan decisions from interview re-anchor.
 
 ---
 
 ## 🎯 RIGHT NOW
 
 - [ ] **Complete Google Play Console identity verification** — account is created, ID verification still pending. The 14-day closed-testing clock can't fully start until verification clears. Check your email + the Play Console dashboard for whatever Google is asking for. (Waiting on Google, no action you can take besides responding to whatever they ask.)
-- [ ] **Schedule the 2 captain interviews** (own club only — own captain + own secretary). USE THE NEW SCRIPT in `notes/captain-interview-script.md` — added 2026-04-08 evening as part of CEO review (3 new questions test killer-feature latency vs Daum push, M2 status-quo switching cost, and PIPA notice baseline).
-  - Interview A: your own club's captain — date/time scheduled? ___
-  - Interview B: your own club's secretary — date/time scheduled? ___
-- [ ] **NEW (CEO Decision 24): Naver Band write-scope verification** — 30-90 min research at **developers.band.us** (the Band Open API has its own portal — NOT developers.naver.com). With Module 3 now PROTECTED in MVP (no longer a cut valve), this is load-bearing. If approval-gated, start the application THE SAME DAY as the research. See BUILD.md Part 0.7 for full instructions. Document result in `notes/homework-results.md`.
+- [ ] **Naver Band app review — resubmitted 2026-04-18, awaiting result (~2026-04-25)** — second submission went in with `Libero` / `리베로` naming, Android service type selected, and real GitHub Pages URLs (`https://hykhyk189.github.io/Libero/` service URL, `https://hykhyk189.github.io/Libero/oauth/callback/` redirect URI — both verified HTTP 200). Repo `hykhyk189/Libero` is now PUBLIC, Pages enabled on main root. If approved: check whether `WRITE_POST` scope on the approved app is self-serve, approval-gated, or 사업자등록-gated (BUILD.md Part 0.7 three-bucket question, just one gate deeper than originally planned). If rejected again: escalate via developers.band.us contact form — do NOT blind-retry a third time.
+**Scope note (post-interview re-anchor 2026-04-17, decisions baked):** 8 new BUILD.md decisions (34-41) baked into BUILD.md + DESIGN.md v4 + TODOS.md. M2 pivoted to reference-matched deposit classifier. Members schema gains 6 nullable columns (birth_date, gender, address, phone, jersey_size, jersey_number). Attendance = v1.1 M3 extension. NotificationListenerService + true-attendance parked to TODOs. Multi-manager premise re-confirmed. M1 framing validated.
 
-**Scope note (revised 2026-04-08 evening, CEO review):** captain interview format kept at 2 own-club only. Module 3 status changed from "cut valve" to "protected" — if you run late, polish + Maestro coverage gets cut, NOT a module. Reframed killer-feature thesis from "shared SoT between two equal managers" → "operations layer for amateur club captains."
-
-**Next time you open this file:** Play Console verification is the long pole (waiting on Google), but the captain interviews are the gating item before W1 starts. If both are done and the W1 gates haven't been triggered yet, scroll to "📅 NEXT" — W1 gates are up.
+**Next time you open this file:** Band review is in flight (resubmitted 2026-04-18, expected result ~2026-04-25). Check the developers.band.us dashboard ~4/25. Play Console verification is passive (waiting on Google). Pre-W1 homework is now idle-waiting — both open items are external dependencies, no user action between now and Band's response. Then W1 gates are up.
 
 ---
 
 ## 📅 THIS WEEK (between tonight and W1 starting)
 
-- [ ] **Captain interview A** — your own club's captain
-  - Format: 30-60 min, walk-me-through-last-week, "show me your phone"
-  - Ask the killer question: "Show me the last tournament you missed and tell me why"
-  - Write up to `notes/captain-interview-captain.md` verbatim
-- [ ] **Captain interview B** — your own club's secretary (총무)
-  - Same format. Critical for validating the multi-manager handoff dynamic.
-  - Listen for: where does the captain hand off to her, where does she sigh, what does she double-check
-  - Write up to `notes/captain-interview-secretary.md` verbatim
-- [ ] **Captain interview synthesis** — write `notes/captain-interview-synthesis.md`
-  - Key question: did anything they said BREAK the design? If yes → re-run /office-hours and update DESIGN.md BEFORE W1
-  - Specifically check: does the secretary actually do the KakaoBank reconciliation, or does the captain? That answer gates Module 2's UX assumptions.
+- (Captain interviews and synthesis complete — see DONE.)
 
-**Done with this week when:** all captain interviews written up, synthesis exists, repo has its first commit (in RIGHT NOW), and Play Console verification has cleared.
+**Done with this week when:** the 3 open plan decisions are resolved (RIGHT NOW), Naver Band write-scope research is complete, and Play Console verification has cleared.
 
 ---
 
@@ -59,7 +45,7 @@ Any gate fails AND fallback fails → STOP, rethink, do not proceed to W2.
 
 ## 🚧 BLOCKED / WAITING ON
 
-Nothing blocked right now. Update this section if a gate fails, an interview reveals a design break, the captain doesn't respond, or any external dependency stalls.
+- **Naver Band app review in flight — resubmitted 2026-04-18, expected result ~2026-04-25.** First submission (2026-04-08) rejected 2026-04-18 with no disclosed reason. Second submission went in with Korean naming + live GitHub Pages URLs + Android service type. Unblocks when Band approves (Client ID appears in dashboard) OR when scope gate is resolved. Escalation path if second rejection: developers.band.us contact form — NOT a third blind retry.
 
 ---
 
@@ -67,6 +53,11 @@ Nothing blocked right now. Update this section if a gate fails, an interview rev
 
 Newest first.
 
+- **2026-04-18** — **주민번호 first-7-digits CONFIRMED by captain.** The baked assumption in BUILD.md Decision 35 stands. No Drive-backed architecture pivot needed. Supabase plan holds. PIPA classification stays as "general personal information" (not 고유식별정보) — captain-attestation pattern in W2 schema + W4 UI checkbox remains sufficient. `members` schema gains the 6 nullable columns as planned (birth_date, gender, address, phone, jersey_size, jersey_number). Pre-W1 homework is now down to two external-dependency waits: Band review (~2026-04-25) and Play Console verification.
+- **2026-04-18** — **Naver Band app resubmitted (2nd attempt).** First submission (2026-04-08, name="Libero", placeholder URLs) rejected 2026-04-18 — Band does not disclose reasons. Root causes diagnosed: English-only naming, `.placeholder`/`.local` Service/Redirect URIs, and the original Redirect URI pointing at a github.com repo path (which 404s, not a real served page). Fix-stack for resubmission: (a) added `리베로` Korean name, (b) set service type to Android (was `미선택` before), (c) spun up GitHub Pages landing (`https://hykhyk189.github.io/Libero/`) with a Korean description + an `/oauth/callback/` placeholder page, (d) flipped `hykhyk189/Libero` repo from PRIVATE → PUBLIC, (e) verified both URLs return HTTP 200 before submit. Commit `52b55d8` shipped the two HTML files. Regression flagged for BUILD.md Part 0.7: the portal's Step 2 app creation itself is reviewed (~1 week), not just the `WRITE_POST` scope — the three-bucket question applies to the scope gate AFTER app approval, not at app-creation time.
+
+- **2026-04-17** — **Interview re-anchor decisions baked into BUILD.md + DESIGN.md + TODOS.md.** 8 new BUILD.md decisions (34-41) added as a new "Interview Re-anchor Decision Log (2026-04-17)" section. W2 schema section updated with `payment_references` migration + 6 new members columns. W8 updated with reference-table UI + extended member form. W9 updated with reference-matched classification pass (PRIMARY) + fuzzy name-match (SECONDARY). DESIGN.md bumped to v4 — Decision Reversals table grew from 15 rows to 21, members schema annotated with new columns, M2 section header got a v4 redirect pointing at the reference-matched framing, `payment_references` table added to data model. TODOS.md gained new v1.1 section (attendance-as-M3-extension RSVP-only, NotificationListenerService exploration) and v2 section (true attendance with captain-marks-present UI). 0 new unresolved decisions. One 30-second captain confirmation remains in RIGHT NOW (주민번호 first-7 vs full-13) as a cheap verification of the plan's baked assumption.
+- **2026-04-17** — **Both captain interviews complete + synthesis captured + `/plan-ceo-review` re-anchor session.** Interviewed own-club captain and secretary. User provided consolidated synthesis (not per-speaker verbatim) → captured to `notes/captain-interview-combined.md`. Synthesis + premise analysis in `notes/captain-interview-synthesis.md`. Key findings: (1) **multi-manager premise CONFIRMED** (both described overlapping workflows); (2) **주민번호 in current Excel = first-7-digits only** (생년월일+성별, PIPA general personal information, not 고유식별정보) → captain-attestation pattern sufficient, 30-sec captain-confirmation task added to RIGHT NOW; (3) **Drive-backed architecture pivot considered and rejected** — user proposed storing member data in captain's Google Drive; once 주민번호 recharacterized, the PIPA urgency evaporated and original Supabase plan preserved; (4) **M1 demo framing confirmed** — captain has Daum cafe push on, so M1's killer story is filter+structure+one-tap-Band-draft, NOT raw speed (CEO review had already adjusted DESIGN.md line 61 — interview validated); (5) **members schema will add** birth_date + gender + address + phone + jersey_size + jersey_number, covered by W4 attestation; (6) **new product findings surfaced** → 3 open decisions moved to RIGHT NOW: M2 monthly-vs-event reframe, AI deposit classification placement, attendance tracking placement; (7) **NotificationListenerService idea parked** to TODOs (Play Store friction on general finance apps). 0 new BUILD.md decisions baked yet — pending the 3 RIGHT-NOW decisions.
 - **2026-04-08 (post-late-evening)** — **`/plan-ceo-review` complete.** Mode: SELECTIVE EXPANSION. 6 expansions proposed → 3 accepted + 2 deferred + 1 skipped. 4 cross-model tensions surfaced via outside voice (Claude subagent, codex unavailable) and all resolved by user. **12 new BUILD.md decisions baked in (Decisions 22-33) on top of the existing 21 eng-review decisions.** Major changes: (1) **reframed killer-feature thesis** from "shared SoT between two equal managers" → "operations layer for amateur club captains" — multi-manager is a capability not the headline, M1 leads on demo, M2 is the depth play, M3 is the breadth play; (2) **Module 3 upgraded from W9 cut-valve to PROTECTED in MVP** — new cut valve = polish + Maestro coverage; (3) **Naver Band write-scope verification moved to W1 P0** alongside KIPRIS + captain interviews; (4) **PIPA captain-attestation pattern** added (W2 schema column + W4 UI checkbox + privacy policy section) to address third-party member PII legal exposure surfaced by outside voice; (5) **Sentry moved to W3** (was W11 polish); (6) **GitHub Actions CI added in W3**; (7) **cafe post link button added to W6** (15 min trust escape hatch); (8) **W12-13 acquisition prep block added** (cafe post wording, 홍보 rules, in-app KakaoTalk Sharesheet referral, in-person 60-sec demo script); (9) **Haiku schema decision register baked in** (multi-date posts, 수도권 전체, 오픈/친선, parser_confidence rubric); (10) **member deletion = anonymize pattern** (PIPA-compliant + audit-trail intact). Files changed: BUILD.md (12 new decisions + multiple section updates), DESIGN.md (v3 banner + CEO review section coming next), CLAUDE.md (voice + anti-conventions updated), TODOS.md (5 new entries with sharpened triggers), `notes/captain-interview-script.md` (NEW with 3 new questions). 0 unresolved decisions. ENG + CEO CLEARED.
 - **2026-04-08 (late evening)** — **Design conviction clarified: Libero v1 has zero role-based UI branching.** All users inside a club see identical screens with identical permissions, regardless of whether they're labeled captain or 총무. The captain/secretary distinction is metadata only, not a permission gate. Role-based UI/permission differentiation is explicitly v2 work, deferred until ≥10 active captains complain about 권한 분리. Saved as feedback memory + added to TODOS.md as a v2 entry. The killer-feature framing simplifies to "shared source of truth between two equal managers" — drop the "captain's tool" / "secretary's tool" framings entirely.
 - **2026-04-08 (late evening)** — Confirmed Android emulator is already API 34 (not API 24 as initially feared). No swap needed. Ready for Android testing in W3.
@@ -107,7 +98,7 @@ LIVE             ░░░░░░░░░░  not started
 ```
 
 **Major milestones with dates as you hit them:**
-- [ ] First captain interview done — date: ___
+- [x] First captain interview done — **2026-04-17** (both own-club captain and secretary, synthesis in `notes/captain-interview-synthesis.md`)
 - [x] First commit pushed — **2026-04-08** (commit `d75574a`, pushed to private GitHub remote `hykhyk189/Libero`)
 - [ ] W1 all 5 gates passed — date: ___
 - [ ] W3 sign-in works on real Galaxy — date: ___

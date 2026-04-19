@@ -2,7 +2,56 @@
 
 Deferred work captured during eng review or build. Each item has context for future-you.
 
+## v1.1 fast-follow (after MVP ships)
+
+### Attendance tracking as M3 extension (RSVP scope only)
+**What:** Extend Module 3 (Naver Band auto-post) to also READ the auto-posted practice poll's comment thread. Parse the comments (via Band Open API + Haiku comment parser if needed) to identify which members said yes/no. Surface as an "attendance-rate" view: "지난 4주 김철수님 출석률 75%".
+
+**Scope clarifier — this is RSVP tracking, NOT true attendance.** "Attendance" colloquially means "did you physically show up at practice." This feature captures "who said yes to the poll." Many members say yes and don't show up. True attendance requires a captain-marks-present UI at the gym — that stays v2+ (see below).
+
+**Why v1.1 (not v1):** captain asked for it in the 2026-04-17 interview ("출석률 체크할 수 있으면 좋겠다 ... (밴드) 댓글 확인해서 출석률 반영?"). Natural extension of M3's existing Band API integration — reuses the auth token, the cron infrastructure, and the Haiku eval harness. Not a new module.
+
+**Why NOT v1:** M3 in v1 has tight scope (post-only). Adding comment-read + attendance-rate-view doubles M3's UI surface and adds a new data flow. Safer to ship the post-only v1, then extend.
+
+**Trigger:** v1 shipped AND M3 post-only verified working in closed test OR ≥3 closed-test captains ask for attendance visibility explicitly.
+
+**Depends on:** Module 3 live, Band Open API comment-read scope (may require additional API scope beyond the post scope — verify in v1.1 scoping).
+
+**Context:** Interview Re-anchor Decision 39 (2026-04-17). Captain's suggestion is clever and low-cost-at-the-margin; just not scope for v1.
+
+---
+
+### NotificationListenerService exploration (risky, Play-Store-gated)
+**What:** Intercept KakaoBank's "X원이 입금되었습니다" push notifications directly on the Android device via `NotificationListenerService`. Feed the parsed amount/sender into the same reference-matching algorithm that M2 uses for Excel imports. Real-time reconciliation with zero user action.
+
+**Why deferred (hard):** Google Play restricts `NotificationListenerService` to apps with a "core use case" (screen reader, SMS backup, car dash display). General personal finance apps have had approvals revoked by Play Store review historically. Also: the permission reads ALL notifications — privacy surface is large.
+
+**Design already future-compatible:** the `ReferenceMatcher` in M2 operates on `ParsedTransaction` regardless of source. A notification-listener input would produce the same shape of object. Swap is mechanical — no algorithm changes needed.
+
+**Trigger:** (a) Play Store explicitly clarifies the "core use case" criteria in Libero's favor, OR (b) a real user pattern emerges where Excel-upload friction is the #1 complaint in closed test AND we have a way to justify to Play Store review.
+
+**Context:** Interview Re-anchor Decision 38 (2026-04-17). Captain independently proposed the mechanism — smart product thinking, wrong platform risk profile for v1.
+
+**Depends on:** v1 shipped, Play Store landscape shift OR real user demand signal.
+
+---
+
 ## v2 (post-MVP, after real users complain)
+
+### True attendance tracking (captain marks present at the gym)
+**What:** A captain-facing UI at practice to mark which members physically showed up. Produces a real attendance-rate metric distinct from the RSVP-rate metric from v1.1's Band-comment-read feature.
+
+**Why deferred to v2:** New UX surface (captain taps present/absent per member during or after practice), new data flow (`attendance_records` table with timestamp + location optional), real attendance UX debate (mark-as-I-see-them vs batch-confirm-at-end vs QR-scan-at-door). Non-trivial.
+
+**Why NOT v1.1:** v1.1 extends M3 via Band comment reading — cheap, reuses existing scaffolding. True attendance is a new module with new schema. Don't lump these together.
+
+**Trigger:** ≥5 closed-test or production captains ask for physical-show-up tracking (not just RSVP) OR a club disputes a member's attendance claim.
+
+**Depends on:** v1 shipped, RSVP feature v1.1 landed, real user demand for the finer-grained metric.
+
+**Context:** Interview Re-anchor Decision 39 (2026-04-17).
+
+---
 
 ### Role-based UI / permission differentiation (captain vs 총무)
 **What:** Add UI branching and permission checks based on whether a user is the "captain" or "secretary" of a club. Examples: only the captain can edit tournament preferences; only the secretary can upload KakaoBank Excel; the captain has a "Mark as Paid" override the secretary doesn't; secretary sees a "Finance" tab the captain doesn't, etc.

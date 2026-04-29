@@ -51,7 +51,7 @@ The user should NEVER have to edit PROGRESS.md themselves. If you forget to upda
 
 ## Project conventions
 
-- Android package: `kr.libero.captain` (assumes "리베로" was clean on KIPRIS — confirm in PROGRESS.md before using anywhere)
+- Android package: `kr.libero.captain` (KIPRIS confirmed clean 2026-04-08, locked)
 - Min Android SDK: 26 (Android 8.0)
 - Database: Supabase Postgres (single source of truth)
 - **No Room or DataStore in v1** — see TODOS.md, this is v2 work. v1 uses in-memory `StateFlow` only.

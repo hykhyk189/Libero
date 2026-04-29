@@ -134,23 +134,21 @@ Write the data layer, networking, models, and module logic once in Kotlin. Compo
 
 ### Week-1 Prototype Gate (CRITICAL)
 
-Before any other build work, spend the first week proving the **two load-bearing assumptions** that the entire design rests on. If either fails, the whole project needs rethinking before any Android app work begins.
+> **⚠️ v3 update (eng review 2026-04-08):** the original DESIGN.md described 2 W1 gates. Per Eng Review Decision 13 there are now **5 gates** (1A-1E). BUILD.md W1 has the full prescription with code samples. The summaries below are the headline; trust BUILD.md for execution detail.
 
-**Gate 1A — Daum scraper feasibility.** Cloudflare Workers have no headless browser. If Daum requires JS execution, dynamic CSRF tokens, or anti-bot challenges that need a real browser, a fetch-only Worker scraper breaks.
+Before any other build work, prove all 5 load-bearing assumptions in W1. If any fails AND no fallback works, the architecture is wrong.
 
-1. Locally script a `fetch` call against the cafe with the user's logged-in Daum cookies. Confirm posts are returned in HTML.
-2. If fetch-only works: deploy as Cloudflare Worker, confirm cookies survive the env-var serialization.
-3. If fetch-only fails: pivot to **Plan B** — host the scraper on a small Fly.io or Railway instance running Playwright headless Chrome. Adds ~$5/mo and +2-3 days of setup, but unblocks the project.
-4. Document cookie freshness window: how long does a Daum session last before re-login is needed?
+**Gate 1A — Daum scraper feasibility.** Verify that a `fetch` call (from a Supabase Edge Function — NOT Cloudflare Workers; see Decision Reversal 1) against the cafe with logged-in Daum cookies returns post HTML. Document cookie freshness window. If fetch-only fails, fallback is the same edge function with a server-side fetch retry pattern.
 
-**Gate 1B — fastexcel-reader smoke test on a real KakaoBank export.** Module 2's entire architecture rests on parsing the bank's `.xlsx` correctly on-device. If fastexcel-reader chokes on Korean column headers, merged cells, or summary rows, Module 2 needs a different parser.
+**Gate 1B — fastexcel-reader smoke test on a real KakaoBank export.** Module 2's architecture rests on parsing `.xlsx` correctly on-device. Get a real export from your secretary, run fastexcel-reader in a JVM scratchpad. If it chokes on Korean column headers, merged cells, or summary rows, fallback is POI XSSF on-device (adds ~5-10MB to APK).
 
-1. Get a real KakaoBank 거래내역 다운로드 export from your secretary (the homework you're doing anyway).
-2. In a JVM scratchpad project (no Android, just `gradle init` and a `main()`), feed the file to fastexcel-reader.
-3. Confirm: column headers extract correctly, all transaction rows are read, name field is in the expected column, no UTF-8 corruption, no merged-cell crashes.
-4. If fastexcel-reader fails on the real file: try **POI XSSF** in the same scratchpad (POI is fine on JVM/Android, just adds ~5-10MB to the APK if used on-device — acceptable hit if it's the only option). If neither works, the design needs a parser rethink.
+**Gate 1C — FCM delivery on Samsung with battery optimization.** The #1 reason Korean Android push apps fail. Test on a real Galaxy with default battery settings; expect ≥4/5 delivery success. If fail, mandatory in-app guide screen for 잠자지 않는 앱.
 
-**Gate decision:** if either gate fails and no fallback works in week 1, the killer feature(s) are not feasible and the design needs rethinking before any Android app work begins.
+**Gate 1D — Credential Manager + Sign in with Google on Korean OEM.** Test the modern Credential Manager API on at least 2 Galaxy devices. If fail, fall back to the legacy `GoogleSignInClient` (deprecated but works everywhere).
+
+**Gate 1E — Supabase Edge Function latency from Korea.** Verify p50 warm <100ms and p99 cold <1s. If cold-start latency is over budget, mitigate via a heartbeat cron to keep functions warm.
+
+**Gate decision:** any gate fails AND fallback fails → STOP, rethink, do not proceed to W2.
 
 ### System Architecture
 
@@ -159,19 +157,19 @@ Before any other build work, spend the first week proving the **two load-bearing
     ↕ Supabase Kotlin SDK (Auth + Postgres + Realtime)
     ↕ Firebase Cloud Messaging (FCM)
 
-[Supabase] ← source of truth
-    - Postgres (clubs, members, payments, tournaments, prefs, aliases)
-    - Auth (Sign in with Google, with Kakao Login as alt provider)
-    - Edge Functions (push dispatch, Band API calls, invite-link minting)
+[Supabase] ← source of truth (single platform — no Cloudflare, no Fly.io; see Decision Reversal 1)
+    - Postgres (clubs, members, payments, tournaments, prefs, aliases, payment_references)
+    - Auth (Sign in with Google; Kakao Login deferred to v1.1)
+    - Edge Functions:
+        · scrape_daum_cafe — pg_cron every 3h, fetches Daum, calls Haiku, writes tournaments
+        · dispatch_tournament_match — Postgres trigger fires on tournaments insert, parallelized FCM fan-out
+        · post_band_poll — Supabase scheduled trigger, calls Naver Band Open API (if approved)
+        · redeem_invite_code — 6-char code validation
     - RLS policies enforce per-club data isolation
+    - pg_cron orchestrates scraper schedule
 
-[Cloudflare Worker — scraper] (or Fly.io + Playwright if fetch-only fails)
-    - Cron: every 3 hours (locked, within 2-4h stealth envelope)
-    - Logs into Daum with cookies from env var
-    - Fetches new posts from 'Let's go 생활체육배구'
-    - Calls Anthropic Haiku to extract tournament fields
-    - Writes to Supabase tournaments table
-    - Triggers Supabase Edge Function to fan out FCM push
+[Anthropic Claude Haiku] — called from scrape_daum_cafe to extract tournament fields
+[Firebase Cloud Messaging] — push delivery only (no Firestore, no Firebase Auth — Supabase Auth handles login)
 ```
 
 ### Data Model (sketch)
@@ -332,29 +330,24 @@ club_subscriptions (
 
 **RLS policies (sketch):** every table with `club_id` enforces `club_id IN (SELECT club_id FROM club_managers WHERE user_id = auth.uid())`. Tables without `club_id` (`users`, `push_tokens`) enforce `user_id = auth.uid()`. `tournaments` is global (not club-scoped) but read-only to clients; only the scraper service-role key writes.
 
-**Invite flow (end-to-end):**
-1. Existing manager taps "Invite secretary" in club settings
-2. Android app calls Supabase Edge Function `mint_invite` → Edge Function inserts row into `club_invites` with new UUID token, `expires_at = now() + 7 days`, `used_at = null`, returns the token
-3. App constructs an invite URL: `https://<your-domain>/invite/<token>` and launches an Android Sharesheet via `Intent.ACTION_SEND` with `type = "text/plain"` and the URL as `EXTRA_TEXT`. KakaoTalk appears in the picker because it's installed on every Korean phone and registers an `ACTION_SEND text/plain` intent filter. No KakaoTalk SDK needed.
-4. New manager taps the URL on their Android phone → Android **App Links** (verified deep link via `assetlinks.json` hosted at `https://<your-domain>/.well-known/assetlinks.json`) opens the app at the invite-redemption screen
-5. New manager signs in with Google (Sign in with Google is the only auth provider at MVP; Kakao Login is deferred to v1.1) if not already signed in
-6. App calls Edge Function `redeem_invite(token)` → Edge Function validates: row exists, `used_at IS NULL`, `expires_at > now()` → inserts `(club_id, user_id, joined_at)` into `club_managers` → updates `club_invites.used_at = now()` → returns club info
+**Invite flow (end-to-end) — v3, post-Decision-Reversal-3 (6-char codes, NOT App Links):**
+1. Existing manager taps "Invite secretary" in club settings → app calls `redeem_invite_code` Postgres function (server-side) to mint a fresh 6-char alphanumeric code (excluding 0/O/1/I), with 7-day TTL. The code is stored on the `clubs` row itself (`invite_code` + `invite_code_expires_at` columns).
+2. App constructs a Korean share message: `"[리베로] 가입 코드: ABC123 (7일 유효). 다운로드: <Play Store URL>"` and launches an Android Sharesheet via `Intent.ACTION_SEND` with `type = "text/plain"`. KakaoTalk appears in the picker because it's installed on every Korean phone and registers an `ACTION_SEND text/plain` intent filter. **No KakaoTalk SDK needed. No domain needed. No App Links needed.**
+3. New manager opens the app fresh, signs in with Google, picks "기존 클럽 가입" on the create-or-join branch, types the 6-char code into a text input, taps confirm.
+4. App calls `redeem_invite_code(p_code)` Postgres function → function validates: code matches an existing `clubs.invite_code`, `invite_code_expires_at > now()`, current user not already in `club_managers` → inserts `(club_id, user_id, joined_at)` into `club_managers` → returns club info. Code is single-use; rotating it is one tap in club settings.
+5. New manager lands in the main app, now sees the shared club's data.
+6. **Expiry handling:** code expired → function raises Korean exception "이 가입 코드는 만료되었습니다. 캡틴에게 새 코드를 요청하세요."
+7. **Code-rotation:** captain taps "코드 새로 만들기" in club settings → app updates `invite_code` to a new random 6-char + sets `invite_code_expires_at = now() + 7 days`. Old code immediately raises "expired."
 
-**App Links setup notes (gotchas):**
-- The domain must serve `assetlinks.json` over HTTPS (not HTTP) **before first install** or Android Verified Links will not register the app as the default handler. Use Cloudflare Pages or a static site host, not the Cloudflare Worker scraper.
-- The `assetlinks.json` SHA-256 fingerprints must include both the **Play Store upload key** AND the **Play App Signing key** (Google re-signs all apps with their own key on Play Store distribution). Get the Play App Signing key SHA-256 from Play Console → Setup → App signing.
-- Test with `adb shell pm verify-app-links --re-verify <package>` and `adb shell pm get-app-links <package>` to confirm verification status.
+**Why 6-char codes, not magic links + App Links + domain:** Korean cultural fit (codes match how 카카오/네이버 invite flows work), skips the entire Android App Links setup (assetlinks.json hosting, SHA-256 fingerprint dance, domain purchase). See Decision Reversal 4 for full rationale.
 
 **Sign in with Google setup notes (gotchas):**
 - Supabase's Google provider needs an **OAuth 2.0 Web client ID** configured in Google Cloud Console (used as the `client_id` Supabase passes to Google's OAuth endpoint). It also needs an **Android client ID** with the SHA-1 of the app's signing key, registered in the same Google Cloud project. **Both are required.** Most first-time errors here come from forgetting the Android client ID.
 - Use the Play App Signing key SHA-1, NOT the upload key SHA-1, for the production Android client ID. Use the debug keystore SHA-1 for local development. Register both.
-7. New manager lands in the main app, now sees the shared club's data
-8. **Expiry handling:** if `expires_at < now()`, redeem fails with "이 초대 링크는 만료되었습니다" → user asks the existing manager for a fresh link
-9. **Already-used handling:** if `used_at IS NOT NULL`, redeem fails with "이 초대 링크는 이미 사용되었습니다"
 
-**Realtime sync (multi-manager edits):** Supabase Realtime subscriptions on `member_payments`, `payment_cycles`, `members`, and `tournament_preferences` keyed by `club_id`. When manager A edits a row, manager B's app receives the update within 1-2 seconds via WebSocket and updates Room via the Kotlin SDK's Flow API. **Conflict handling is silent last-write-wins** at row granularity. The loser does not see a toast or warning, just the new value via the realtime subscription. Per-field change tracking ("updated by [name]") was considered and rejected as not worth the complexity at MVP scale.
+**Realtime sync (multi-manager edits):** Supabase Realtime subscriptions on `member_payments`, `payment_cycles`, `payment_references`, `members`, and `tournament_preferences`, **server-side filtered by `club_id`** (Eng Review Decision 21 — filtered subscriptions, not whole-table). When manager A edits a row, manager B's app receives the update within 1-2 seconds via WebSocket and updates the in-memory `StateFlow` directly (no Room layer). **Conflict handling is silent last-write-wins** at row granularity. The loser does not see a toast or warning, just the new value via the realtime subscription. Per-field change tracking ("updated by [name]") was considered and rejected as not worth the complexity at MVP scale.
 
-**Offline writes (Room as cache):** Room is the local cache and the source of UI state via Compose `collectAsState`. Writes go to Supabase first; on success, Room is updated via the Realtime subscription. On network failure, writes are queued in a `pending_writes` Room table and retried on reconnect. Queue order is preserved per club. This is sufficient for two managers in a single club; full CRDT-style offline merge is deferred to post-MVP if real users complain.
+**Offline writes (v3 — superseded by Decision Reversal 2):** the original v1 design used Room as the local cache + a `pending_writes` queue. Eng review reversed both. v1 ships with **in-memory `StateFlow` only**, sourced directly from the Supabase Kotlin SDK. Cold-start UI shows a brief spinner; the killer-feature push-to-detail path is mitigated via the FCM data-payload trick (full tournament ships in the push, no fetch needed). Persistent cache (DataStore + tiny Room) is v2 work — see TODOS.md "Persistent cache layer." Offline writes are not supported in v1; if the network is down, writes fail with a Korean error toast and the user retries.
 
 ### Push Dispatch Path
 
@@ -362,17 +355,19 @@ club_subscriptions (
 - **Postgres trigger** on `tournaments` insert calls a **Supabase Edge Function** `dispatch_tournament_match`
 - Edge Function: query all `tournament_preferences` where regions/division/date match → for each matched club → query `club_managers.user_id` → query `push_tokens` → call **FCM HTTP v1 API** (`https://fcm.googleapis.com/v1/projects/{project}/messages:send`) with the device token and notification payload
 - **FCM auth:** Edge Function uses a Firebase Admin SDK service account JSON (download from Firebase Console → Project Settings → Service Accounts; store the entire JSON as a Supabase secret named `FIREBASE_SERVICE_ACCOUNT_JSON`). Mint a short-lived OAuth bearer token by signing a JWT with the service account private key (RSA-SHA256), then exchange it at `https://oauth2.googleapis.com/token`. Use the [`jose`](https://deno.land/x/jose) Deno library for JWT signing (RSA-SHA256 in 5 lines, vs ~40 lines of Web Crypto glue). Cache the resulting access token for its 1-hour TTL inside the Edge Function via a module-level variable. Required service account role: **Firebase Admin SDK Administrator Service Agent** (auto-assigned when downloading the service account JSON from Firebase Console — do not assign manually).
-- Single dispatch path. Cloudflare Worker is for scraping only; Supabase Edge Functions handle all push and Band API calls.
+- Single dispatch path. All scraping, push dispatch, and Band API calls live in Supabase Edge Functions — no second cloud platform (Decision Reversal 1).
 
-### Modules (numbering note)
+### Modules (numbering — v3)
 
-I'm preserving the original numbering from the prior session for continuity. The MVP includes Modules 1, 2, and 4. Module 3 (Lineup Planner) is intentionally deferred to v1.1 fast-follow. Yes, the gap looks weird — but renumbering would break references in the user's existing notes.
+**Current numbering (post-eng-review Decision 15):** the MVP has 3 modules — **Module 1 (Tournament Notifier)**, **Module 2 (Reference-Matched Deposit Classifier)**, **Module 3 (Naver Band Auto-Post)**. The original v1 doc had a 1/2/4 layout with "Module 3" reserved for the Lineup Planner; eng review renumbered the MVP to 1/2/3 and the Lineup Planner is now v1.1 fast-follow work referenced by name, not number.
+
+When prose below uses "Module 4" (and there are leftover stragglers in v3 cleanup), it means **the same thing as Module 3 today** — Naver Band auto-post. The "v3 numbering note" further down explains the history; ignore that note if you're starting fresh, the canonical labels are Module 1 / Module 2 / Module 3 / Lineup Planner-as-v1.1.
 
 #### Module 1 (KILLER): 대회 알림 — Tournament Notifier
 - Captain or secretary sets `tournament_preferences` per club (regions, date range, divisions, avoid weekdays)
 - Backend cron pulls Daum cafe → LLM-parses → upserts to `tournaments` (dedup by `cafe_post_id`) → Edge Function dispatches FCM to all matching clubs' managers
 - Tap notification → tournament details view in-app → save to watchlist
-- One-tap "draft Naver Band 대회 출전 투표" → pre-formatted text + (optionally auto-post via Module 4 infrastructure if user enabled it)
+- One-tap "draft Naver Band 대회 출전 투표" → pre-formatted text + (optionally auto-post via Module 3 infrastructure if user enabled it)
 - Captain marks "applied" or "skipped"
 
 **Acceptance criteria:**
@@ -427,23 +422,24 @@ I'm preserving the original numbering from the prior session for continuity. The
 - Given the secretary assigns an unmatched row to a member, when she uploads the next month's file, then that name auto-matches without prompting (alias persisted to `member_aliases`).
 - Given two managers edit the same `member_payments` row simultaneously, when both save, then last-write-wins applies silently and the loser sees the winner's value via Supabase Realtime within 2 seconds.
 
-#### Module 4: 주간 연습 투표 헬퍼 — Practice Poll
+#### Module 3: 주간 연습 투표 헬퍼 — Practice Poll (was Module 4 in v1/v2; PROTECTED in MVP per CEO Decision 23)
 - Captain configures recurring weekly poll: court name, time, day-of-week, message template
 - Stored in `band_polls` with cron expression
 - Supabase Edge Function `post_band_poll` runs on Supabase scheduled trigger, calls Naver Band Open API write endpoint
-- Reactions/comments visible in-app via Band API read endpoints
+- Reactions/comments visible in-app via Band API read endpoints (v1.1 attendance extension)
 - **Fallback if API call fails:** Edge Function writes failure to a `band_post_failures` queue → FCM notification to captain "Today's poll didn't auto-post, tap to copy and paste manually"
+- **Fallback if Naver Band API access is permanently denied** (real possibility post-2-rejections in pre-W1): ship M3 with manual clipboard-paste implementation per BUILD.md Part 0.7 buckets (a)/(b), revisit API integration in v1.1 if 사업자등록 path opens. M3 is PROTECTED — it ships in some form, even if degraded.
 
-**Pre-build verification (homework):** confirm the Naver Band Open API write scope is self-serve and not approval-gated. The user verified the API exists; the *write* scope specifically needs a separate check before committing 1 week to this module.
+**Pre-build verification (now in active escalation, not just homework):** Naver Band Open API write scope verification was moved to **W1 P0** per CEO Decision 24 — 8+ weeks of lead time before W10. As of late April 2026, Band has rejected two app-creation submissions without disclosed reasons; escalation via developers.band.us contact form is in flight (see PROGRESS.md). Module 3's degraded fallback paths above are now load-bearing, not theoretical.
 
 **Acceptance criteria:**
 - Given an enabled `band_polls` row with cron `0 9 * * 1` (Monday 9am KST), when Monday 9am arrives, then a poll is posted to the configured Band group within 5 minutes.
 - Given the API call fails, when the failure occurs, then the captain receives a push notification with a one-tap "copy poll text" action.
 
-#### Module 3: 라인업 플래너 — DEFERRED to v1.1
-Drag-and-drop 9인제 lineup, save templates, share as image to KakaoTalk. Ships ~2 weeks after MVP launch.
+#### Lineup Planner — DEFERRED to v1.1 (was originally numbered "Module 3" in v1; renumbered out)
+Drag-and-drop 9인제 lineup, save templates, share as image to KakaoTalk. Ships ~2 weeks after MVP launch. Referenced by name in BUILD.md and TODOS.md — no module number in v3.
 
-> **v3 numbering note:** the v2 module numbering was confusing because Module 4 was the cut valve. Eng review Decision 15 renumbered the MVP modules as 1, 2, 3 (where the new "Module 3" is the old "Module 4 — Band auto-post") and the old "Module 3 — Lineup Planner" stays deferred to v1.1. CEO review Decision 23 then upgraded the new Module 3 (Band auto-post) from cut-valve to PROTECTED. So in BUILD.md, **Module 3 = Band auto-post (mandatory MVP)**, and **the old "Module 3 Lineup Planner" is now a v1.1 item only**. This DESIGN.md still has both labels in places — when in doubt, BUILD.md wins.
+> **v3 numbering history (kept for reference only):** the v1/v2 doc had Module 1 (Tournament), Module 2 (Payments), Module 3 (Lineup Planner — deferred), Module 4 (Band auto-post — was cut-valve). Eng review Decision 15 renumbered the MVP to 1/2/3 (Tournament / Payments / **Band auto-post**), and the Lineup Planner became a v1.1 item without a module number. CEO Decision 23 then upgraded the new Module 3 (Band auto-post) from cut-valve to PROTECTED. BUILD.md is canonical. Stop using "Module 4" — it's been Module 3 since 2026-04-08.
 
 ### Tech Stack (v3 — superseded entries marked, see Decision Reversals above)
 
@@ -474,24 +470,27 @@ Drag-and-drop 9인제 lineup, save templates, share as image to KakaoTalk. Ships
 
 The reviewer flagged the original 7-8 week estimate as optimistic. Realistic breakdown:
 
+> **⚠️ v3 update:** the Effort table below is the original v1/v2 estimate. Several rows are superseded by eng review (Hilt → Koin, Room → in-memory, App Links → invite codes, see Decision Reversals 2-5). BUILD.md is the canonical week-by-week and totals ~13 weeks including 14-day closed-test calendar window. Treat this table as historical context, not the live plan.
+
 | Phase | Weeks |
 |---|---|
 | Captain interview (homework, before code) | included in pre-build, not coding |
-| **Week 1 GATE:** Daum scraper prototype (Plan A or B) + fastexcel-reader smoke test on real KakaoBank export | 1 |
-| Supabase setup + auth + RLS + invite flow + App Links domain + assetlinks.json | 1 |
-| Android scaffold (Compose + Hilt + Room) + Sign in with Google + onboarding + Compose nav | 1 |
+| **Week 1 GATE:** 5 gates per Eng Review Decision 13 (Daum scraper, fastexcel, FCM-on-Samsung, Credential Manager OEM, Supabase latency) | 1 |
+| Supabase setup + auth + RLS + invite codes (6-char, no App Links, no domain) | 1 |
+| Android scaffold (Compose + **Koin** + **in-memory StateFlow**) + Sign in with Google + onboarding + Compose nav + Sentry + GitHub Actions CI | 1 |
 | Module 1 (Tournament Notifier): preferences UI + scraper integration + LLM parser + dispatch + FCM setup + notification handling | 3-4 |
-| Module 2 (Payment Tracker): cycle UI + roster + Excel upload (SAF) + fuzzy match + alias dict + manual confirmation UX | 1.5-2 |
-| Module 4 (Band auto-post): scheduling UI + Edge Function + Band API integration + failure path | 1-1.5 |
+| Module 2 (Reference-Matched Deposit Classifier): cycle UI + roster + reference table CRUD + Excel upload (SAF) + reference-match + fuzzy name-match + alias dict + manual confirmation UX | 2-2.5 |
+| Module 3 (Band auto-post): scheduling UI + Edge Function + Band API integration + failure path | 1-1.5 |
 | Korean Google Play data safety form + privacy policy hosting + review iteration | 0.5-1 |
-| **Subtotal (build + submit)** | **9-10.5 weeks** |
-| **Google Play 14-day closed-testing window** (LOCKED — new personal account confirmed) | **+2 weeks (overlap-able with Module 4 polish)** |
-| **Total MVP** | **11-12.5 weeks** |
-| v1.1 Module 3 (Lineup Planner) fast follow | +1-2 |
+| **Subtotal (build + submit)** | **~10-11 weeks** |
+| **Google Play 14-day closed-testing window** (LOCKED — new personal account confirmed) | **+2 weeks (overlap-able with W11 polish)** |
+| **Total MVP** | **~13 weeks** (BUILD.md is canonical) |
+| v1.1 Lineup Planner fast follow | +1-2 |
 | v1.1 Kakao Login provider added alongside Google | +0.5 |
+| v1.1 Attendance tracking (M3 extension, RSVP scope) | +1 |
 | v2 (post-MVP): iOS port via SwiftUI rewrite | +6-8 (separate, not counted in MVP) |
 
-**Schedule slack policy:** Module 4 is the designated cut valve. If Modules 1+2 run over by more than a week, Module 4 is dropped from MVP and deferred to v1.1 alongside Module 3. This is an explicit trade-off the user has agreed to in advance — no mid-build re-litigation needed. The 14-day Play closed-testing window is overlap-able with Module 4 polish, but the 14 days are calendar days, not work days, so the closed test must start at least 14 days before intended production launch. Plan accordingly.
+**Schedule slack policy (v3 — superseded by CEO Decision 23):** the original v1/v2 designated **Module 4** (now Module 3, Band auto-post) as the cut valve. CEO Decision 23 reversed this — Module 3 is now **PROTECTED in MVP**. The new cut valve is **polish + Maestro test coverage**: if W4-W9 modules run over, you ship with thinner test coverage and rougher polish, NOT with a missing module. The reframed thesis ("operations layer for amateur club captains") is hollow at MVP if any of M1/M2/M3 is missing. The 14-day Play closed-testing window is calendar days, so the closed test must start at least 14 days before intended production launch.
 
 ### Cost itemization (v3)
 
@@ -514,7 +513,7 @@ A Korean app handling personal data (member names, KakaoTalk handles, payment re
 
 - **Privacy policy** in Korean, linked from app + Play Store listing. Specifies what data is collected, why, where it's stored, and retention.
 - **Minimum data collection**: member rosters and payment data are stored in Supabase (encrypted at rest). Bank export Excel files are parsed locally; only the parsed match results (name, amount, paid status) are synced — never the raw Excel.
-- **Daum cookies** are stored as Cloudflare Worker secrets (encrypted at rest). They're scraping infrastructure, not user data, but should be rotated per the cookie freshness window.
+- **Daum cookies** are stored as Supabase Edge Function secrets via `supabase secrets set` (encrypted at rest). They're scraping infrastructure, not user data, but should be rotated per the cookie freshness window.
 - **No third-party analytics** at MVP. Add later only with explicit consent.
 - **Data deletion**: managers can delete the club entirely from settings → cascade deletes all related rows.
 - **Google Play Data Safety form**: declare collected data types — name (linked to user), contacts (member roster), financial info (payment records). Declare encryption in transit (Supabase HTTPS) and at rest (Postgres). Declare data deletion path. Korean Play Store reviewers scrutinize financial-data apps; the privacy policy URL must resolve to a real Korean-language page on submission day.
@@ -522,18 +521,18 @@ A Korean app handling personal data (member names, KakaoTalk handles, payment re
 
 ## Open Questions
 
-These do not block the design but need resolution before or during build:
+These do not block the design but need resolution before or during build. Resolved entries are marked ✅ inline so the active list stays scannable.
 
-1. **Daum cookie freshness window** — answered by Week-1 Prototype Gate
-2. **KakaoBank Excel file type and column structure** — get a real export from secretary before building parser
-3. **Naver Band Open API write scope** — verify self-serve vs approval-gated before committing Module 4 effort
-4. **Korean Google Play Console registration** — does free-app publishing need a Korean address or 사업자등록? (Generally lighter than paid-app requirements, but confirm.)
-5. **Cafe 홍보 rules** — does 'Let's go 생활체육배구' allow self-promo posts? Affects distribution plan, not the build
-6. **Default Module 4 schedule** — what cadence should the auto-post default to? Captain can override, but a sensible default reduces onboarding friction
-7. **Daum cookie freshness detection** — concretely: scraper runs each cycle, on HTTP 401/403 or login-page redirect, write a row to a `scraper_failures` table → trigger Edge Function → FCM alert to user (the developer) "Daum cookies expired, refresh required." Manual rotation by editing the Cloudflare secret via dashboard or `wrangler secret put`. Acceptable for MVP scale (one developer, one user pair).
-8. **fastexcel-reader on real KakaoBank export — moved to Week 1 Gate 1B above.** Resolved before Module 2 estimate is committed.
-9. **FCM works reliably on Korean Galaxy/One UI devices in 2026.** This is almost certainly fine (FCM is bundled into Google Play Services on every Android device sold in Korea), but verify in Week 2 with one real push to your captain's phone before building the dispatch path on top of it.
-10. **Google Play Console: confirmed NEW personal account** (resolved 2026-04-08 PM). 14-day closed-testing window applies. Recruit 12+ testers from your volleyball club + friends + Reddit r/volleyball / r/korea before the test starts. The closed test should run during Module 4 build so the 14 calendar days overlap real polish work.
+1. **Daum cookie freshness window** — answered by Week-1 Gate 1A.
+2. **KakaoBank Excel file type and column structure** — get a real export from secretary before building parser. (Now part of W1 Gate 1B.)
+3. ✅ **Naver Band Open API write scope** — verification moved to W1 P0 (CEO Decision 24); 2 submissions rejected as of late April 2026, escalation in flight. Module 3 ships in some form regardless (PROTECTED, with degraded fallbacks per Module 3 description above).
+4. **Korean Google Play Console registration** — partially answered: NEW personal account confirmed (2026-04-08 PM), 14-day closed-test window applies. Identity verification still pending Google's response.
+5. **Cafe 홍보 rules** — does 'Let's go 생활체육배구' allow self-promo posts? Deferred to W12-13 acquisition prep block (CEO Decision 32). Affects distribution, not the build.
+6. **Default Module 3 schedule** — what cadence should the auto-post default to? Captain can override, but a sensible default reduces onboarding friction. Open until W10 implementation.
+7. **Daum cookie freshness detection** — scraper runs each cycle; on HTTP 401/403 or login-page redirect, write a row to a `scraper_failures` table → FCM alert to user (the developer) "Daum cookies expired, refresh required." Manual rotation via `supabase secrets set DAUM_COOKIE="<paste>"`. Acceptable for MVP scale.
+8. ✅ **fastexcel-reader on real KakaoBank export** — covered by W1 Gate 1B.
+9. **FCM reliability on Korean Galaxy/One UI in 2026** — covered by W1 Gate 1C.
+10. ✅ **Google Play Console: NEW personal account** — confirmed 2026-04-08 PM. 14-day closed-testing window applies. Tester recruitment list locked (12+ Android-using humans identified).
 
 ## Reviewer Concerns (declined recommendations — accepted risks, plus CEO review additions)
 
@@ -557,7 +556,7 @@ The user explicitly declined recommendations from the design discussion AND from
 
 3. **Captain interview without shadowing.** Recommended shadowing the captain through one full club cycle (practice + tournament app + money cycle) before the interview. User chose interview-only. **Cost if wrong: 2-3 weeks of building modules the captain doesn't actually need.** Mitigation: run the interview in walk-me-through-last-week format with verbatim quotes, no pitching the design.
 
-4. **Module 4 in MVP (declined cut).** Reviewer recommended cutting Module 4 (Band auto-post) from MVP and deferring alongside Module 3, on the grounds that two integrations + auto-posting + fallback path don't fit one week and don't serve the top-of-funnel CV story (which is tournament discovery + payment reconciliation). User wants Module 4 in MVP. **Cost if wrong: Module 4 takes 1.5+ weeks instead of 1, MVP slips by ~1 week.** Mitigation: build Modules 1+2 first; if either runs over, Module 4 is the first thing cut to v1.1.
+4. ~~**Module 4 in MVP (declined cut).**~~ **Resolved by CEO Decision 23 (2026-04-08 evening):** what was Module 4 (now Module 3, Band auto-post) is **PROTECTED in MVP**, no longer the cut valve. The original v1/v2 reviewer recommended cutting it; the CEO review reversed that recommendation because the reframed thesis ("operations layer for amateur club captains") is hollow at MVP without all 3 modules. The new cut valve is polish + Maestro coverage. Original concern preserved here for historical traceability only.
 
 ## Success Criteria
 
@@ -565,7 +564,7 @@ The user explicitly declined recommendations from the design discussion AND from
 - At least 1 verified captain using it daily for ≥2 weeks (the user's own club's captain)
 - ≥1 successful payment cycle reconciled end-to-end via Excel import in real club use
 - ≥1 tournament discovered and applied via push notification
-- Module 4 auto-post running for ≥4 consecutive weeks without manual fallback
+- Module 3 auto-post running for ≥4 consecutive weeks without manual fallback (or, if Naver Band API access is blocked, the manual clipboard-paste fallback from Module 3's description above)
 - Stretch: 3-5 captains in cafe network using it
 - Korean-language README + screenshots + 60-second demo video on the Play Store listing
 - Open source repo (or private with portfolio access) with clean commit history (portfolio hygiene, not a build task)
@@ -574,24 +573,27 @@ The user explicitly declined recommendations from the design discussion AND from
 
 The MVP ships free for everyone. Focus is adoption and learning, not monetization. The freemium pivot happens **at month 6, after ≥200 active captains use Libero daily**, not on a fixed calendar date.
 
+> **⚠️ v3 update (CEO review 2026-04-08):** the original Pro tier centered on **auto-Band posting (Module 4)** as the load-bearing "saves time every week" hook. CEO Decision 23 promoted Module 3 (Band auto-post) to PROTECTED in MVP — auto-Band is now a **free-tier feature**. The Pro tier below has been re-cut accordingly. Be honest with yourself: without auto-Band, the Pro tier no longer has a single killer feature — it's a bundle of mid-value perks. Whether that bundle is worth 4,900원/mo to a Korean amateur captain is exactly what the **month-3 strategic decision** in TODOS.md is meant to surface. If month-3 usage signal is weak, this section gets deleted along with the subscription scaffold.
+
 ### Tier structure (locked design, deferred activation)
 
-**Free tier (default for everyone):**
+**Free tier (default for everyone — includes the original v2 "killer" feature, auto-Band):**
 - 1 club
 - Tournament Notifier with 3-hour polling
-- Payment Tracker (Excel upload, fuzzy match, alias dict)
-- Manual Naver Band post (clipboard paste)
+- Payment Tracker (Excel upload, fuzzy match, alias dict, reference-matched classification)
+- **Naver Band auto-post (Module 3)** — recurring weekly practice poll. Was Pro-only in v2; now free per CEO Decision 23.
 - Up to 30 members per club
 - Up to 12 tournament regions in preferences
 
-**Pro tier (4,900원/mo or 49,000원/yr):**
+**Pro tier (4,900원/mo or 49,000원/yr) — bundle of perks, no single killer feature:**
 - **Multi-club management** (captain runs more than one club — rare but high-value)
-- **Auto-Band posting** (Module 4 — the only feature that saves time *every single week*; this is the load-bearing Pro hook)
 - **Advanced tournament filters** (skill-level slider, fee range, distance from home, prior-tournament dedup)
 - **Priority polling** (1-hour scrape cadence instead of 3 — uses a separate scraper instance to avoid Daum stealth concerns; only Pro clubs get the higher cadence)
 - **Excel export** of payment history for tax/club records
 - **Custom 미납 reminder templates** (Free uses one canned template)
 - **Unlimited members + regions**
+
+**Honest assessment of the Pro hook strength post-CEO-review:** of the 6 Pro features above, only "priority polling" arguably saves time every week, and only for clubs in regions where popular tournaments fill in <3 hours. The rest are nice-to-haves. If the month-3 decision triggers the freemium pivot, expect to either (a) raise priority polling's prominence in the Pro pitch, (b) layer a B2B 클럽 플랜 (Path B) on top, or (c) scope a new Pro-only feature post-launch (e.g., RSVP analytics layered on the v1.1 attendance extension).
 
 ### Pricing rationale
 
@@ -642,33 +644,40 @@ This is **NOT replace-your-job income.** It IS:
 
 ## Next Steps (concrete build order)
 
-**Pre-build (homework, no code):**
-1. **Captain interview** — 30 min, walk-me-through-last-week format, quotes verbatim. **Confirm captain's phone is Android** (it almost certainly is, but verify on day 1)
-2. **KIPRIS trademark check** — search "리베로" and "Libero" in Nice Class 9 (software) and Class 42 (SaaS) at kipris.or.kr. If clean, lock the name. If conflict, fall back to "리베로 캡틴" / "Libero Captain."
-3. **Verify cafe 홍보 rules** — read cafe rules, DM 카페매니저 if needed
-4. **Get a real KakaoBank Excel export** from secretary, document column structure, file type (`.xlsx` vs `.xls`), encoding
-5. **Verify Naver Band Open API write scope** — confirm self-serve vs approval-gated
-6. **Verify Korean Google Play Console registration requirements** for free apps (free apps generally need less than paid apps; confirm the 사업자등록 requirement specifically)
-7. **Set up:** Google Play Console ($25 one-time, NEW personal account — start the account today, the 14-day testing clock matters), Firebase project (Auth + FCM only, no Firestore), Supabase project, Cloudflare account, Anthropic API key, Android Studio + JDK 17, **buy domain** (`libero.kr`, `liberoapp.kr`, or similar — also check `libero.club`)
+> **⚠️ v3 update:** BUILD.md Part 0 is the canonical day-1 setup (KIPRIS, Play Console, captain interviews, Firebase, Supabase, Anthropic, Naver Band, local tooling). The list below is the v1/v2 prose rewritten to match v3 reality. **No Cloudflare account, no domain purchase** — both eliminated by Decision Reversals 1, 4, 5.
 
-**Week 1 (gate):**
-7. **Daum scraper prototype** — fetch-only first; pivot to Playwright if needed; gate the rest of the build on success
-8. **fastexcel-reader smoke test** — pull a real KakaoBank `.xlsx`, parse it in a JVM scratchpad project, confirm column extraction works before scaffolding the Android app
+**Pre-build (homework, no code):**
+1. **Captain interview** — 30 min × 2 (own captain + own secretary), walk-me-through-last-week format, quotes verbatim. **Confirm captain's phone is Android** (it almost certainly is, but verify on day 1)
+2. **KIPRIS trademark check** — search "리베로" and "Libero" in Nice Class 9 (software) and Class 42 (SaaS) at kipris.or.kr. If clean, lock the name. If conflict, fall back to "리베로 캡틴" / "Libero Captain."
+3. **Verify cafe 홍보 rules** — read cafe rules, DM 카페매니저 if needed (deferred to W12-13 acquisition prep per CEO Decision 32)
+4. **Get a real KakaoBank Excel export** from secretary, document column structure, file type (`.xlsx` vs `.xls`), encoding
+5. **Verify Naver Band Open API write scope** — moved to W1 P0 per CEO Decision 24. Process documented in BUILD.md Part 0.7.
+6. **Verify Korean Google Play Console registration requirements** for free apps (free apps generally need less than paid apps; confirm the 사업자등록 requirement specifically)
+7. **Set up:** Google Play Console ($25 one-time, NEW personal account — start the account today, the 14-day testing clock matters), Firebase project (Auth + FCM only, no Firestore), Supabase project, Anthropic API key, Android Studio + JDK 17. **No Cloudflare account. No domain purchase.** Privacy policy hosting uses Notion public page (W11) per Decision Reversal 6.
+
+**Week 1 (gate — 5 gates per Eng Review Decision 13):**
+8. Gate 1A: Daum scraper feasibility (Supabase Edge Function fetch, NOT Cloudflare Workers)
+9. Gate 1B: fastexcel-reader smoke test on real KakaoBank `.xlsx`
+10. Gate 1C: FCM delivery on real Samsung with battery optimization
+11. Gate 1D: Credential Manager + Sign in with Google on Korean OEM
+12. Gate 1E: Supabase Edge Function latency from Korea
 
 **Weeks 2-10 (build):**
-9. Supabase schema + RLS + Sign in with Google + invite flow + **subscription scaffold tables (free tier seeded, no checkout flow)**
-10. Android scaffold (Compose + Hilt + Room) + onboarding + FCM token registration + **`subscription.has(feature)` helper (returns true at MVP)**
-11. Module 1 (Tournament Notifier + FCM + LLM parsing + dispatch)
-12. Internal Testing track with captain + secretary (own club) — gather 1 week of real notification feedback
-13. Module 2 (Excel + fuzzy match + alias dict)
-14. Module 4 (Band auto-post + scheduling + fallback)
-15. Korean Google Play submission (Internal → Closed 14-day → Production)
+13. Supabase schema + RLS + Sign in with Google + 6-char invite codes + **subscription scaffold tables (free tier seeded, no checkout flow)** + PIPA captain-attestation pattern (W2 schema column + W4 UI checkbox)
+14. Android scaffold (Compose + **Koin** + **in-memory StateFlow**) + onboarding + FCM token registration + Sentry (W3) + GitHub Actions CI (W3) + **`subscription.has(feature)` helper (returns true at MVP)**
+15. Module 1 (Tournament Notifier + FCM + Haiku parsing + dispatch + W6 eval suite ≥85% pass + cafe post link button)
+16. Internal Testing track with captain + secretary (own club) — gather 1 week of real notification feedback
+17. Module 2 (Excel + reference-matched classifier + fuzzy name-match + alias dict + per-row human confirmation)
+18. Module 3 (Band auto-post + scheduling + fallback — PROTECTED in MVP, ships in some form even if API approval is blocked)
+19. W12-13 acquisition prep block (cafe post wording, in-app KakaoTalk Sharesheet referral, in-person 60-sec demo script) — runs in parallel with the 14-day closed-test calendar window
+20. Korean Google Play submission (Internal → Closed 14-day → Production)
 
 **Post-launch:**
-16. Distribute via cafe post (after rules verified)
-17. v1.1 fast follow: Module 3 lineup planner (1-2 weeks)
-18. **Month 6: freemium activation.** Build TossPayments + KakaoPay checkout, flip the gating logic, soft-launch Pro tier to existing users with a 1-month free trial. Only after ≥200 daily active captains.
-19. v2 (later): iOS port via SwiftUI rewrite (~6-8 weeks, treated as a separate project)
+21. Distribute via cafe post (after rules verified)
+22. v1.1 fast follow: Lineup Planner (1-2 weeks), Kakao Login (~0.5 wk), attendance tracking as M3 extension RSVP-only (~1 wk)
+23. **Month 3: strategic CV-vs-SaaS decision.** ≥50 active captains → start 사업자등록 + Toss merchant flow. ≤10 → delete subscription scaffold, commit to pure CV piece. In between → another month of data.
+24. **Month 6: freemium activation** (only if month-3 decision triggered the SaaS pivot). Build TossPayments + KakaoPay checkout, flip the gating logic, soft-launch Pro tier to existing users with a 1-month free trial. Only after ≥200 daily active captains.
+25. v2 (later): iOS port via SwiftUI rewrite (~6-8 weeks, treated as a separate project)
 
 ## What I noticed about how you think
 

@@ -4,8 +4,8 @@
 >
 > Reference docs: [DESIGN.md](DESIGN.md) (the what + why) · [BUILD.md](BUILD.md) (the how + when) · [TODOS.md](TODOS.md) (deferred work)
 
-**Last updated:** 2026-04-18 (Band app resubmitted; 주민번호 first-7 confirmed by captain; waiting on Band + Play Console)
-**Current phase:** Pre-W1 homework (captain interviews DONE 2026-04-17; 주민번호 first-7 CONFIRMED 2026-04-18; Play Console pending; Naver Band app resubmitted 2026-04-18 with GitHub Pages URLs + Korean naming + Android service type)
+**Last updated:** 2026-04-24 (Band 2nd submission also rejected; escalation to developers.band.us contact form is the next action)
+**Current phase:** Pre-W1 homework (captain interviews DONE 2026-04-17; 주민번호 first-7 CONFIRMED 2026-04-18; Play Console pending; Naver Band — 2nd submission rejected 2026-04-24, escalation via contact form pending)
 **Overall:** Day 9 of ~13 weeks (calendar) — environment fully set up and both captain interviews complete. Key findings: multi-manager premise confirmed; 주민번호 in club Excel is first-7-only (PIPA general info, not 고유식별정보); Supabase architecture preserved (Drive pivot considered and rejected); members schema grows by ~5 fields. Remaining before W1: Play Console verification (waiting on Google), Naver Band write-scope verification, 3 plan decisions from interview re-anchor.
 
 ---
@@ -13,10 +13,10 @@
 ## 🎯 RIGHT NOW
 
 - [ ] **Complete Google Play Console identity verification** — account is created, ID verification still pending. The 14-day closed-testing clock can't fully start until verification clears. Check your email + the Play Console dashboard for whatever Google is asking for. (Waiting on Google, no action you can take besides responding to whatever they ask.)
-- [ ] **Naver Band app review — resubmitted 2026-04-18, awaiting result (~2026-04-25)** — second submission went in with `Libero` / `리베로` naming, Android service type selected, and real GitHub Pages URLs (`https://hykhyk189.github.io/Libero/` service URL, `https://hykhyk189.github.io/Libero/oauth/callback/` redirect URI — both verified HTTP 200). Repo `hykhyk189/Libero` is now PUBLIC, Pages enabled on main root. If approved: check whether `WRITE_POST` scope on the approved app is self-serve, approval-gated, or 사업자등록-gated (BUILD.md Part 0.7 three-bucket question, just one gate deeper than originally planned). If rejected again: escalate via developers.band.us contact form — do NOT blind-retry a third time.
+- [ ] **Naver Band — escalate via developers.band.us contact form (2nd rejection 2026-04-24)** — two submissions, two rejections, no disclosed reasons (Band policy: 상세 사유 비공개). Pages URLs re-verified HTTP 200 after rejection, so "dead link" is ruled out. Third blind retry is prohibited. Korean escalation message drafted — file it at developers.band.us contact form with screenshots of both rejected rows attached. Ask Band directly: (a) why the app-creation request was denied, (b) what specifically needs to change, (c) whether personal-developer (non-사업자등록) apps can register at all. If Band responds with a fixable reason: address it and resubmit. If Band confirms personal developers cannot register: trigger BUILD.md Part 0.7 bucket (a) or (b) — ship M3 with manual clipboard-paste fallback + revisit API integration in v1.1 if 사업자등록 path opens later. Module 3 is still PROTECTED (CEO Decision 23); polish + Maestro coverage are the cut valves, not M3.
 **Scope note (post-interview re-anchor 2026-04-17, decisions baked):** 8 new BUILD.md decisions (34-41) baked into BUILD.md + DESIGN.md v4 + TODOS.md. M2 pivoted to reference-matched deposit classifier. Members schema gains 6 nullable columns (birth_date, gender, address, phone, jersey_size, jersey_number). Attendance = v1.1 M3 extension. NotificationListenerService + true-attendance parked to TODOs. Multi-manager premise re-confirmed. M1 framing validated.
 
-**Next time you open this file:** Band review is in flight (resubmitted 2026-04-18, expected result ~2026-04-25). Check the developers.band.us dashboard ~4/25. Play Console verification is passive (waiting on Google). Pre-W1 homework is now idle-waiting — both open items are external dependencies, no user action between now and Band's response. Then W1 gates are up.
+**Next time you open this file:** Band 2nd submission was rejected 2026-04-24 (Pages URLs still live, "dead link" ruled out). Next action is escalating via developers.band.us contact form — message is drafted below (RIGHT NOW item). Play Console verification is passive (waiting on Google). Once Band responds, the fork is: fixable → resubmit; personal-dev blocked → pivot M3 to clipboard-paste fallback per BUILD.md Part 0.7 bucket (a)/(b).
 
 ---
 
@@ -45,7 +45,7 @@ Any gate fails AND fallback fails → STOP, rethink, do not proceed to W2.
 
 ## 🚧 BLOCKED / WAITING ON
 
-- **Naver Band app review in flight — resubmitted 2026-04-18, expected result ~2026-04-25.** First submission (2026-04-08) rejected 2026-04-18 with no disclosed reason. Second submission went in with Korean naming + live GitHub Pages URLs + Android service type. Unblocks when Band approves (Client ID appears in dashboard) OR when scope gate is resolved. Escalation path if second rejection: developers.band.us contact form — NOT a third blind retry.
+- **Naver Band — 2nd rejection 2026-04-24, escalation to developers.band.us contact form pending.** Two submissions, two rejections, no reasons disclosed. Pages URLs re-verified HTTP 200 post-rejection. Third blind retry is prohibited. Unblocks when: (a) Band support replies to contact form with a fixable reason and the next submission clears, OR (b) Band confirms personal-developer apps cannot register without 사업자등록 → pivot M3 to manual clipboard-paste fallback per BUILD.md Part 0.7, revisit API in v1.1.
 
 ---
 

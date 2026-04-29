@@ -4,6 +4,30 @@ Deferred work captured during eng review or build. Each item has context for fut
 
 ## v1.1 fast-follow (after MVP ships)
 
+### Configurable practice days for Band auto-post poll (weekly default + per-poll holiday override)
+**What:** Two-layer day selection for the Module 3 Naver Band auto-posted practice poll.
+
+1. **Weekly default (settings screen).** Captain (or any user — v1 has no role gating, see below) picks the club's regular practice days as a multi-select of weekdays (e.g., 월/목 for a Mon/Thu club, 화/금/일 for a Tue/Fri/Sun club). Future scheduled auto-posts use these as the default poll options.
+2. **One-time per-upcoming-poll override.** Before the next scheduled auto-post fires, user can open the pending poll, see the day options it WILL post, and edit them just for that one occurrence (without changing the weekly default). Use case: 광복절 lands on a Monday, gym is closed → uncheck 월 for this week's poll, leave 목 only. Next week the poll reverts to the weekly default 월/목.
+
+**Why v1.1 (not v1):** M3 v1 ships post-only with hardcoded or single-day poll content. Adding (a) a settings screen for weekly defaults, (b) a "preview + edit upcoming scheduled post" surface, and (c) the persistence model that distinguishes recurring template from per-occurrence override is real UX surface. M3 v1 should ship the post mechanic first; configurability layers on after captains have validated they actually want to use the auto-post.
+
+**Why important enough to capture now (not just leave to "we'll see"):** Korean public holidays (어린이날, 광복절, 개천절, 추석/설날 연휴, etc.) regularly fall on weekdays, and most amateur volleyball clubs rent gym time from 학교 / 구민체육센터 / 시 시설관리공단 facilities that close on holidays. Same is true for one-off closures (시설 점검, 시 행사 사용, 입시 시즌 학교 락다운). Without the override, the auto-post advertises a day the gym is closed → confused members RSVP yes → captain has to manually delete the Band post and repost. That regression undoes M3's whole "captain doesn't lift a finger" value prop on roughly 8-12 days per year.
+
+**Why two layers and not just one:** A weekly-default-only model makes holidays painful (captain has to edit weekly settings every holiday week and remember to undo it). A per-poll-only model makes the common case painful (captain re-picks 월/목 every single week). The two-layer model — recurring template + lightweight per-occurrence override — matches how this kind of scheduling actually works in calendar apps and is the minimum that doesn't annoy.
+
+**Explicitly NOT in scope for this TODO:** automatic Korean-holiday detection / calendar integration. Different gyms have different holiday policies (some 시설관리공단 gyms run on red days, some don't; some clubs practice on 광복절 because the gym does open). The captain knows her gym's policy better than any heuristic. Manual override is the right primitive; a holiday-aware suggestion layer is a v2+ polish on top of this v1.1 foundation.
+
+**Trigger:** v1 shipped AND M3 post-only verified working in production AND (a) ≥1 closed-test or production captain reports manually deleting/reposting a Band poll because of a gym closure, OR (b) a Korean public holiday falls on a club's regular practice day during closed test (deterministic — calendar-driven trigger, will fire within ~2 months of any closed test that overlaps a holiday).
+
+**Depends on:** Module 3 (Naver Band auto-post) live in v1, basic settings screen scaffolding in the app, schema column on `clubs` (or a new `club_schedule_templates` table) for the weekly default + a `scheduled_band_posts` row representing each pending occurrence so per-occurrence overrides have somewhere to live without mutating the template.
+
+**Equal-UI consistency note:** consistent with the v1 design conviction (every user inside a club has identical permissions — see role-based UI v2 entry below), ANY club member can edit both the weekly default and the per-poll override. No captain-only gate. If clubs later complain that this should be 권한 분리'd, that's the same v2 trigger as the broader role-differentiation TODO.
+
+**Context:** Surfaced 2026-04-29 by user. Sits on top of M3's existing scope and reuses the auto-post infrastructure rather than introducing new scaffolding.
+
+---
+
 ### Attendance tracking as M3 extension (RSVP scope only)
 **What:** Extend Module 3 (Naver Band auto-post) to also READ the auto-posted practice poll's comment thread. Parse the comments (via Band Open API + Haiku comment parser if needed) to identify which members said yes/no. Surface as an "attendance-rate" view: "지난 4주 김철수님 출석률 75%".
 
